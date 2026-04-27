@@ -1,13 +1,14 @@
-# Modelado de datos v1.0
+# Modelado de datos v1.0.1
 
-*23/04/2026*
+*27/04/2026*
 
-Modelado de datos para el sistema de mensajería, **se asume que el administrador es único** y se siguen las siguientes reglas:
+Modelado de datos para el sistema de mensajería, para el que se siguen las siguientes reglas:
 
+- El administrador es único.
 - El administrador crea salas (`Room`) y el id de sala (`Room.id`) se genera automáticamente.
 - Si la sala es tipo texto ('TEXT'), solo permite el envío de mensajes de texto
 - Si la sala es tipo multimedia ('MULTIMEDIA'), permite el envío de mensajes de texto y archivos con límite de tamaño configurable.
-- El usuario (`UserSession`) se une a la sala mediante el pin de sala y un nickname.
+- El usuario (`UserSession`) se une a la sala mediante el pin de sala, que identifica a cada sala.
 - El nickname del usuario (`UserSession.nickname`) es único dentro de la sala.
 - El dispositivo del usuario (`UserSession.device`) solo puede estar unido a una sala a la vez.
 
@@ -17,7 +18,7 @@ Modelado de datos para el sistema de mensajería, **se asume que el administrado
 
 - `id`: identificador único de la sala (PK, generado automáticamente)
 - `name`: nombre de la sala (string)
-- `pin_hash`: hash del PIN de acceso a la sala (string)
+- `pin`: PIN de acceso a la sala (string, generado automáticamente)
 - `type`: tipo de sala, puede ser 'TEXT' o 'MULTIMEDIA' (enum)
 - `created_at`: fecha y hora de creación de la sala (datetime)
 - `is_active`: indica si la sala está activa (boolean)
@@ -103,7 +104,4 @@ direction LR
 
 ## Por definir (dudas)
 
-- ¿El administrador es único? ¿Hay más de un administrador?
-  - Según las respuestas, se crea o no la tabla `Admin`.
-- ¿El usuario necesita el id de sala? ¿El administrador invita al usuario?
-  - Según las respuestas, se pide o no un id de sala para que el usuario ingrese a una sala
+*Ninguna duda*
