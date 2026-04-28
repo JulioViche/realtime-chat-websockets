@@ -6,7 +6,7 @@ const app = express()
 app.use(express.json())
 
 mongoose
-  .connect(process.env.MONGsO_URI, {
+  .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
