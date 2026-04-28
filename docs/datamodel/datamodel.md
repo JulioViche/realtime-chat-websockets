@@ -1,57 +1,57 @@
-# Modelado de datos v1.0.1
+# Modelado de datos v1.0.2
 
-*27/04/2026*
+*28/04/2026*
 
 Modelado de datos para el sistema de mensajería, para el que se siguen las siguientes reglas:
 
 - El administrador es único.
-- El administrador crea salas (`Room`) y el id de sala (`Room.id`) se genera automáticamente.
+- El administrador crea salas (`Room`) y el id de sala (`Room._id`) se genera automáticamente.
 - Si la sala es tipo texto ('TEXT'), solo permite el envío de mensajes de texto
 - Si la sala es tipo multimedia ('MULTIMEDIA'), permite el envío de mensajes de texto y archivos con límite de tamaño configurable.
 - El usuario (`UserSession`) se une a la sala mediante el pin de sala, que identifica a cada sala.
 - El nickname del usuario (`UserSession.nickname`) es único dentro de la sala.
-- El dispositivo del usuario (`UserSession.device`) solo puede estar unido a una sala a la vez.
+- El dispositivo del usuario (`UserSession.deviceId`) solo puede estar unido a una sala a la vez.
 
 ## Entidades
 
 ### Room
 
-- `id`: identificador único de la sala (PK, generado automáticamente)
+- `_id`: identificador único de la sala (PK, generado automáticamente)
 - `name`: nombre de la sala (string)
 - `pin`: PIN de acceso a la sala (string, generado automáticamente)
 - `type`: tipo de sala, puede ser 'TEXT' o 'MULTIMEDIA' (enum)
-- `created_at`: fecha y hora de creación de la sala (datetime)
-- `is_active`: indica si la sala está activa (boolean)
+- `isActive`: indica si la sala está activa (boolean)
+- `createdAt`: fecha y hora de creación de la sala (datetime, generado automáticamente)
 
 ### UserSession
 
-- `id`: identificador único de la sesión (PK, generado automáticamente)
-- `room_id`: referencia a la sala (`Room`) (FK, uuid)
-- `device_id`: identificador único del dispositivo (string)
-- `ip_address`: dirección IP del usuario (string)
+- `_id`: identificador único de la sesión (PK, generado automáticamente)
+- `roomId`: referencia a la sala (`Room`) (FK, ObjectId)
+- `deviceId`: identificador único del dispositivo (string)
+- `ipAddress`: dirección IP del usuario (string)
 - `nickname`: apodo del usuario en la sesión (string)
-- `connected_at`: fecha y hora de conexión (datetime)
-- `last_activity`: fecha y hora de la última actividad, como mensaje o inicio se sesión (datetime)
-- `is_active`: indica si la sesión está activa (boolean)
+- `lastActivity`: fecha y hora de la última actividad, como mensaje o inicio de sesión (datetime)
+- `isActive`: indica si la sesión está activa (boolean)
+- `createdAt`: fecha y hora de conexión (datetime, generado automáticamente)
 
 ### Message
 
-- `id`: identificador único del mensaje (PK, generado automáticamente)
-- `room_id`: referencia a la sala (`Room`) (FK, uuid)
-- `user_id`: referencia a la sesión de usuario (`UserSession`) (FK, uuid)
+- `_id`: identificador único del mensaje (PK, generado automáticamente)
+- `roomId`: referencia a la sala (`Room`) (FK, ObjectId)
+- `userId`: referencia a la sesión de usuario (`UserSession`) (FK, ObjectId)
 - `content`: contenido del mensaje (texto o referencia a archivo) (string)
 - `type`: tipo de mensaje, puede ser 'TEXT' o 'FILE' (enum)
-- `created_at`: fecha y hora de creación del mensaje (datetime)
+- `createdAt`: fecha y hora de creación del mensaje (datetime, generado automáticamente)
 
 ### File
 
-- `id`: identificador único del archivo (PK, generado automáticamente)
-- `message_id`: referencia al mensaje (`Message`) (FK, uuid)
+- `_id`: identificador único del archivo (PK, generado automáticamente)
+- `messageId`: referencia al mensaje (`Message`) (FK, ObjectId)
 - `name`: nombre del archivo (string)
 - `url`: URL de almacenamiento/acceso al archivo (string)
 - `type`: tipo MIME o extensión del archivo (string)
 - `size`: tamaño del archivo en bytes (int)
-- `uploaded_at`: fecha y hora de subida del archivo (datetime)
+- `createdAt`: fecha y hora de subida del archivo (datetime, generado automáticamente)
 
 > Los atributos finales de `File` se tienen que contemplar más adelante
 
@@ -61,39 +61,39 @@ Modelado de datos para el sistema de mensajería, para el que se siguen las sigu
 erDiagram
 direction LR
 	ROOM {
-		int id PK
+		ObjectId _id PK
 		string name
-		string pin_hash
+		string pin
 		string type
-		datetime created_at
-		bool is_active
+		bool isActive
+		datetime createdAt
 	}
 	USERSESSION {
-		int id PK
-		int room_id FK
-		string device_id
-		string ip_address
+		ObjectId _id PK
+		ObjectId roomId FK
+		string deviceId
+		string ipAddress
 		string nickname
-		datetime connected_at
-		datetime last_activity
-		bool is_active
+		datetime lastActivity
+		bool isActive
+		datetime createdAt
 	}
 	MESSAGE {
-		int id PK
-		int room_id FK
-		int user_id FK
+		ObjectId _id PK
+		ObjectId roomId FK
+		ObjectId userId FK
 		string content
 		string type
-		datetime created_at
+		datetime createdAt
 	}
 	FILE {
-		int id PK
-		int message_id FK
+		ObjectId _id PK
+		ObjectId messageId FK
 		string name
 		string url
 		string type
 		int size
-		datetime uploaded_at
+		datetime createdAt
 	}
 
 	MESSAGE ||--o{ FILE : "adjunta"
