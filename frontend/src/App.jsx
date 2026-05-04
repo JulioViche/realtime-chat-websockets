@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import JoinRoom from './components/organisms/JoinRoom'
 import Login from './components/organisms/Login'
+import Room from './components/organisms/Room'
 
 function App() {
   return (
@@ -12,8 +13,8 @@ function App() {
         {/* Ruta de administración */}
         <Route path="/admin" element={<Login />} />
 
-        {/* Placeholder para la futura interfaz del chat */}
-        {/* <Route path="/chat" element={<div>Vista del Chat (en construcción)</div>} /> */}
+        {/* Vista principal de la sala de chat */}
+        <Route path="/room" element={<Room />} />
       </Routes>
     </BrowserRouter>
   )
