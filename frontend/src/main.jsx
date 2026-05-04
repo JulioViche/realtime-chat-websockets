@@ -1,10 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './assets/index.css'
-import JoinRoom from './components/organisms/JoinRoom'
+import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <JoinRoom />
+    <App />
   </StrictMode>,
 )
