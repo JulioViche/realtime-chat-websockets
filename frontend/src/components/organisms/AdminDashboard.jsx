@@ -1,7 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Button from '../atoms/Button'
 
 const AdminDashboard = () => {
+  // Protección de ruta síncrona para evitar "parpadeos"
+  const token = localStorage.getItem('adminToken')
+  if (!token) {
+    window.location.href = '/admin'
+    return null // No renderiza nada mientras redirige
+  }
+
   // Datos simulados (mocks) de las salas activas
   const [rooms, setRooms] = useState([
     { _id: '1', name: 'Sala General', pin: '123456', type: 'MULTIMEDIA', users: 5 },
@@ -14,6 +21,7 @@ const AdminDashboard = () => {
   }
 
   const handleLogout = () => {
+    localStorage.removeItem('adminToken')
     window.location.href = '/admin'
   }
 
