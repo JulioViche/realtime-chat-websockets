@@ -6,7 +6,10 @@ const app = express()
 app.use(express.json())
 
 const roomRoutes = require('./routes/roomRoutes')
+const userSessionRoutes = require('./routes/userSessionRoutes')
+
 app.use('/api/rooms', roomRoutes)
+app.use('/api/sessions', userSessionRoutes)
 
 mongoose
   .connect(process.env.MONGO_URI)
