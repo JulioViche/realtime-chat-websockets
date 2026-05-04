@@ -1,10 +1,10 @@
-import LoginInput from '../atoms/LoginInput'
+import Input from '../atoms/Input'
 
-const LoginField = ({ label, type, placeholder, value, onChange }) => {
+const FormField = ({ label, type, placeholder, value, onChange }) => {
   return (
     <div className="flex flex-col space-y-1 mb-4">
       <label className="text-sm font-medium text-gray-700 ml-1">{label}</label>
-      <LoginInput
+      <Input
         type={type}
         placeholder={placeholder}
         value={value}
@@ -14,4 +14,4 @@ const LoginField = ({ label, type, placeholder, value, onChange }) => {
   )
 }
 
-export default LoginField
+export default FormField
