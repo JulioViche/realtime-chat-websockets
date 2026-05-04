@@ -16,24 +16,29 @@ const Room = () => {
     {
       _id: '2',
       nickname: 'NinjaGamer',
-      content: '¡Hola a todos!',
+      content: '¡Miren esta foto genial!',
+      file: { name: 'gato.jpg', url: 'https://placekitten.com/300/200' },
       isMine: false,
       time: '10:01 AM',
     },
     {
       _id: '3',
       nickname: 'Tú',
-      content: 'Hola Ninja, ¿cómo estás?',
+      content: 'Jaja, está increíble.',
       isMine: true,
       time: '10:02 AM',
     },
   ])
 
-  const handleSendMessage = (text) => {
+  // Simulamos que el tipo de sala viene del Backend
+  const roomType = 'MULTIMEDIA' // 'TEXT' o 'MULTIMEDIA'
+
+  const handleSendMessage = ({ text, file }) => {
     const newMsg = {
       _id: Date.now().toString(),
       nickname: 'Tú',
       content: text,
+      file: file,
       isMine: true,
       time: new Date().toLocaleTimeString([], {
         hour: '2-digit',
@@ -67,7 +72,10 @@ const Room = () => {
       </main>
 
       {/* Footer / Barra para escribir factorizada */}
-      <MessageForm onSendMessage={handleSendMessage} />
+      <MessageForm
+        onSendMessage={handleSendMessage}
+        allowFiles={roomType === 'MULTIMEDIA'}
+      />
     </div>
   )
 }

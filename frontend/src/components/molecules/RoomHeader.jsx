@@ -5,7 +5,7 @@ const RoomHeader = ({ roomName, pin, onlineCount, onLeave }) => {
         <h1 className="text-xl font-bold text-gray-800">{roomName}</h1>
         <p className="text-sm text-gray-500">
           PIN: <span className="font-mono bg-gray-100 px-1 rounded">{pin}</span>{' '}
-          • {onlineCount} en línea
+          • <span className="text-green-500">{onlineCount} en línea</span>
         </p>
       </div>
       <button
