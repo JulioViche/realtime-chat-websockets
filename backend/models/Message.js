@@ -7,9 +7,8 @@ const messageSchema = new mongoose.Schema(
       ref: 'Room',
       required: true,
     },
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'UserSession',
+    user: {
+      type: String,
       required: true,
     },
     content: {

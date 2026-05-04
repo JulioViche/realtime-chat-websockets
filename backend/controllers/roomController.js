@@ -1,5 +1,6 @@
 const Room = require('../models/Room')
-const UserSession = require('../models/UserSession')
+const Message = require('../models/Message')
+const File = require('../models/File')
 
 const generatePin = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -36,55 +37,41 @@ exports.createRoom = async (req, res) => {
   }
 }
 
-exports.joinRoom = async (req, res) => {
+exports.getRoomMessages = async (req, res) => {
   try {
-    const { pin, nickname, deviceId } = req.body
-    // La IP la podemos obtener directamente de la petición (request) de Express
-    const ipAddress = req.ip || req.connection.remoteAddress
+    const { pin } = req.params
 
-    if (!pin || !nickname || !deviceId) {
-      return res
-        .status(400)
-        .json({ error: 'Faltan datos obligatorios (pin, nickname, deviceId)' })
-    }
-
-    // Buscar la sala por PIN
     const room = await Room.findOne({ pin, isActive: true })
-
     if (!room) {
       return res.status(404).json({ error: 'Sala no encontrada o inactiva' })
     }
 
-    // Opcional: Validar que el nickname no exista ya en la sala activa
-    const existingSession = await UserSession.findOne({
-      roomId: room._id,
-      nickname,
-      isActive: true,
-    })
-    if (existingSession) {
-      return res
-        .status(400)
-        .json({ error: 'El nickname ya está en uso en esta sala' })
-    }
+    // Buscar mensajes de la sala
+    const messages = await Message.find({ roomId: room._id }).sort({ createdAt: 1 })
 
-    // Crear la sesión del usuario
-    const newSession = new UserSession({
-      roomId: room._id,
-      deviceId,
-      ipAddress,
-      nickname,
-    })
-
-    const savedSession = await newSession.save()
+    // Como algunos mensajes pueden tener archivos adjuntos, los buscamos
+    // En MongoDB podemos hacer esto manualmente o con agregaciones. Lo haremos manualmente para que sea fácil de entender.
+    const messagesWithFiles = await Promise.all(messages.map(async (msg) => {
+      const msgObj = msg.toObject()
+      
+      if (msgObj.type === 'FILE') {
+        const file = await File.findOne({ messageId: msg._id })
+        if (file) {
+          msgObj.file = {
+            name: file.name,
+            url: file.url,
+            type: file.type
+          }
+        }
+      }
+      return msgObj
+    }))
 
     res.status(200).json({
-      message: 'Te has unido a la sala',
-      session: savedSession,
       roomType: room.type,
+      messages: messagesWithFiles
     })
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: 'Error al unirse a la sala', details: error.message })
+    res.status(500).json({ error: 'Error al obtener mensajes', details: error.message })
   }
 }

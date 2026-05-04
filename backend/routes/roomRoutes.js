@@ -5,7 +5,7 @@ const roomController = require('../controllers/roomController')
 // Crear sala
 router.post('/', roomController.createRoom)
 
-// Unirse a la sala
-router.post('/join', roomController.joinRoom)
+// Obtener historial de mensajes de la sala
+router.get('/:pin/messages', roomController.getRoomMessages)
 
 module.exports = router
