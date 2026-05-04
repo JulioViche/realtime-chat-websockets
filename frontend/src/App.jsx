@@ -16,7 +16,7 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
         {/* Vista principal de la sala de chat */}
-        <Route path="/room" element={<Room />} />
+        <Route path="/room/:pin" element={<Room />} />
       </Routes>
     </BrowserRouter>
   )

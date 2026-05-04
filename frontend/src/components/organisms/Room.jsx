@@ -1,77 +1,188 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useParams } from 'react-router-dom'
+import { io } from 'socket.io-client'
+import axios from 'axios'
+
 import MessageForm from '../molecules/MessageForm'
 import RoomHeader from '../molecules/RoomHeader'
 import MessageBubble from '../molecules/MessageBubble'
 
 const Room = () => {
-  // Datos simulados (mocks) para que puedas ver el diseño sin conectar al backend todavía
-  const [messages, setMessages] = useState([
-    {
-      _id: '1',
-      nickname: 'Sistema',
-      content: 'Bienvenido a la Sala General',
-      isMine: false,
-      time: '10:00 AM',
-    },
-    {
-      _id: '2',
-      nickname: 'NinjaGamer',
-      content: '¡Miren esta foto genial!',
-      file: { name: 'gato.jpg', url: 'https://placekitten.com/300/200' },
-      isMine: false,
-      time: '10:01 AM',
-    },
-    {
-      _id: '3',
-      nickname: 'Tú',
-      content: 'Jaja, está increíble.',
-      isMine: true,
-      time: '10:02 AM',
-    },
-  ])
+  const { pin } = useParams()
+  const [messages, setMessages] = useState([])
+  const [roomType, setRoomType] = useState('TEXT') // 'TEXT' o 'MULTIMEDIA'
+  const [roomId, setRoomId] = useState(null)
+  
+  // Estados UI
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
-  // Simulamos que el tipo de sala viene del Backend
-  const roomType = 'MULTIMEDIA' // 'TEXT' o 'MULTIMEDIA'
+  const socketRef = useRef(null)
+  const myNickname = localStorage.getItem('userNickname')
 
-  const handleSendMessage = ({ text, file }) => {
-    const newMsg = {
-      _id: Date.now().toString(),
-      nickname: 'Tú',
-      content: text,
-      file: file,
-      isMine: true,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+  useEffect(() => {
+    if (!myNickname) {
+      window.location.href = '/'
+      return
     }
 
-    setMessages([...messages, newMsg])
+    // 1. Conectar Socket
+    socketRef.current = io('http://localhost:3000')
+
+    // 2. Intentar unirse a la sala
+    socketRef.current.emit(
+      'joinRoom',
+      { pin, user: myNickname },
+      (response) => {
+        if (response.error) {
+          setError(response.error)
+          setLoading(false)
+        } else {
+          setRoomType(response.roomType)
+          setRoomId(response.roomId)
+          // 3. Si tuvo éxito, cargar el historial de mensajes vía HTTP
+          fetchHistory()
+        }
+      }
+    )
+
+    // 4. Escuchar nuevos mensajes en tiempo real
+    socketRef.current.on('newMessage', (data) => {
+      setMessages((prev) => [...prev, data])
+    })
+
+    // Limpieza al desmontar (cuando el usuario se va)
+    return () => {
+      socketRef.current.disconnect()
+    }
+  }, [pin, myNickname])
+
+  // Función para obtener el historial
+  const fetchHistory = async () => {
+    try {
+      const res = await axios.get(`/api/rooms/${pin}/messages`)
+      setMessages(res.data.messages)
+      setLoading(false)
+    } catch (err) {
+      setError('Error al cargar historial')
+      setLoading(false)
+    }
+  }
+
+  // Manejador del envío
+  const handleSendMessage = async ({ text, file }) => {
+    if (!roomId) return
+
+    let fileData = null
+
+    // Si hay archivo, lo subimos por Axios primero
+    if (file) {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const uploadRes = await axios.post('/api/upload', formData, {
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            )
+            setUploadProgress(percentCompleted)
+          },
+        })
+
+        // Cuando termina, limpiamos la barra y extraemos los datos
+        setUploadProgress(0)
+        fileData = {
+          name: uploadRes.data.file.originalname,
+          url: `http://localhost:3000${uploadRes.data.url}`,
+          type: uploadRes.data.file.mimetype,
+        }
+      } catch (err) {
+        console.error('Error subiendo archivo', err)
+        alert('Hubo un error al subir tu archivo.')
+        setUploadProgress(0)
+        return // No enviar el mensaje si falló el archivo
+      }
+    }
+
+    // Finalmente enviamos el mensaje al túnel de WebSockets
+    const messagePayload = {
+      roomId,
+      content: text,
+      file: fileData,
+      // Nota: El Backend ignorará el nombre que le pasemos y usará el oficial de la RAM,
+      // pero para mantener la forma lo enviamos o simplemente el Backend sabe.
+    }
+
+    socketRef.current.emit('sendMessage', messagePayload)
   }
 
   const handleLeaveRoom = () => {
-    // Redirigir al inicio (simulando salida)
+    localStorage.removeItem('userNickname')
     window.location.href = '/'
+  }
+
+  // --- RENDERS DE ERROR O CARGA ---
+  if (error) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-gray-50">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">Ups, algo salió mal</h2>
+        <p className="mb-4 text-gray-700">{error}</p>
+        <button
+          onClick={handleLeaveRoom}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg"
+        >
+          Volver al Inicio
+        </button>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="mt-4 text-gray-500">Conectando a la sala...</p>
+      </div>
+    )
   }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header del Chat */}
       <RoomHeader
-        roomName="Sala General"
-        pin="123456"
-        onlineCount={5}
+        roomName={`Sala PIN: ${pin}`}
+        pin={pin}
+        onlineCount={'Activo'}
         onLeave={handleLeaveRoom}
       />
 
-      {/* Área de Mensajes */}
+      {/* Barra de Progreso global (opcional) */}
+      {uploadProgress > 0 && (
+        <div className="bg-blue-100 text-blue-800 text-sm py-1 px-4 text-center font-semibold">
+          Subiendo archivo: {uploadProgress}%
+        </div>
+      )}
+
       <main className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.map((msg) => (
-          <MessageBubble key={msg._id} msg={msg} />
-        ))}
+        {messages.length === 0 ? (
+          <p className="text-center text-gray-400 mt-10">No hay mensajes aún. ¡Sé el primero!</p>
+        ) : (
+          messages.map((msg) => (
+            <MessageBubble 
+              key={msg._id} 
+              msg={{
+                ...msg,
+                // El componente MessageBubble esperaba 'nickname' y 'isMine'
+                nickname: msg.user,
+                isMine: msg.user === myNickname,
+                time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }} 
+            />
+          ))
+        )}
       </main>
 
-      {/* Footer / Barra para escribir factorizada */}
       <MessageForm
         onSendMessage={handleSendMessage}
         allowFiles={roomType === 'MULTIMEDIA'}

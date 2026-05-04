@@ -16,8 +16,11 @@ const JoinRoom = () => {
       return
     }
 
-    // Aquí llamaremos al Backend
-    console.log('Intentando unir a sala...', { nickname, pin })
+    // Guardar el nombre temporalmente
+    localStorage.setItem('userNickname', nickname)
+
+    // Redirigir directamente a la sala, la validación se hará por Socket allá
+    window.location.href = `/room/${pin.toUpperCase()}`
   }
 
   return (
