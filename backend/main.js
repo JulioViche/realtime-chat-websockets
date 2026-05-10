@@ -90,10 +90,22 @@ io.on('connection', (socket) => {
   // 1. Cuando el usuario intenta entrar a la sala
   socket.on('joinRoom', async ({ pin, user, force }, callback) => {
     try {
-      // A. Validar que la sala exista en BD
-      const room = await Room.findOne({ pin, isActive: true })
+      // A. Validar que la sala exista en BD (Ahora con PIN encriptado)
+      // Como el PIN está hasheado, no podemos buscarlo directamente.
+      // Buscamos todas las salas activas y comparamos el PIN.
+      const rooms = await Room.find({ isActive: true })
+      let room = null
+      
+      for (const r of rooms) {
+        const isMatch = await r.comparePin(pin)
+        if (isMatch) {
+          room = r
+          break
+        }
+      }
+
       if (!room) {
-        if (callback) callback({ error: 'Sala no encontrada o inactiva' })
+        if (callback) callback({ error: 'Sala no encontrada o PIN incorrecto' })
         return
       }
 

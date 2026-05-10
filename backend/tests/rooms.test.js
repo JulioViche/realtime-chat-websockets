@@ -57,21 +57,27 @@ describe('Room Controller - Unit Tests', () => {
   });
 
   test('GET /api/rooms/:pin/messages - Error si la sala no existe', async () => {
-    Room.findOne.mockResolvedValue(null);
+    Room.find.mockResolvedValue([]);
 
     const response = await request(app).get('/api/rooms/NONEXIST/messages');
 
     expect(response.statusCode).toBe(404);
-    expect(response.body.error).toBe('Sala no encontrada o inactiva');
+    expect(response.body.error).toBe('Sala no encontrada o PIN incorrecto');
   });
 
   test('GET /api/rooms/:pin/messages - Éxito al obtener mensajes', async () => {
-    const mockRoom = { _id: 'room_id_123', type: 'TEXT', pin: '123456', isActive: true };
+    const mockRoom = { 
+      _id: 'room_id_123', 
+      type: 'TEXT', 
+      pin: 'hashed_pin', 
+      isActive: true,
+      comparePin: jest.fn().mockResolvedValue(true)
+    };
     const mockMessages = [
       { _id: 'msg1', content: 'Hola', type: 'TEXT', toObject: () => ({ content: 'Hola', type: 'TEXT' }) }
     ];
 
-    Room.findOne.mockResolvedValue(mockRoom);
+    Room.find.mockResolvedValue([mockRoom]);
     Message.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockMessages)
     });
@@ -85,7 +91,13 @@ describe('Room Controller - Unit Tests', () => {
 
   test('GET /api/rooms/:pin/messages - Éxito al obtener mensajes con archivos (MULTIMEDIA)', async () => {
     const File = require('../models/File');
-    const mockRoom = { _id: 'room_id_123', type: 'MULTIMEDIA', pin: 'MEMES1', isActive: true };
+    const mockRoom = { 
+      _id: 'room_id_123', 
+      type: 'MULTIMEDIA', 
+      pin: 'hashed_pin', 
+      isActive: true,
+      comparePin: jest.fn().mockResolvedValue(true)
+    };
     const mockMessages = [
       { 
         _id: 'msg_file', 
@@ -96,7 +108,7 @@ describe('Room Controller - Unit Tests', () => {
     ];
     const mockFile = { name: 'test.jpg', url: '/uploads/test.jpg', type: 'image/jpeg' };
 
-    Room.findOne.mockResolvedValue(mockRoom);
+    Room.find.mockResolvedValue([mockRoom]);
     Message.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockMessages)
     });

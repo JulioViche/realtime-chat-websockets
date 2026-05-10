@@ -17,7 +17,7 @@ jest.mock('mongoose', () => {
 
 // Mock de los modelos
 jest.mock('../models/Room', () => ({
-  findOne: jest.fn(),
+  find: jest.fn(),
 }));
 jest.mock('../models/Message', () => {
   const m = jest.fn().mockImplementation(() => ({
@@ -78,8 +78,14 @@ describe('WebSocket Integration Tests', () => {
   });
 
   test('joinRoom - success', (done) => {
-    const mockRoom = { _id: 'room123', pin: '1234', type: 'TEXT', isActive: true };
-    Room.findOne.mockResolvedValue(mockRoom);
+    const mockRoom = { 
+      _id: 'room123', 
+      pin: 'hashed_1234', 
+      type: 'TEXT', 
+      isActive: true,
+      comparePin: jest.fn().mockResolvedValue(true)
+    };
+    Room.find.mockResolvedValue([mockRoom]);
 
     // Mock del worker para validateJoin
     const { Worker } = require('worker_threads');
@@ -101,17 +107,23 @@ describe('WebSocket Integration Tests', () => {
   });
 
   test('joinRoom - room not found', (done) => {
-    Room.findOne.mockResolvedValue(null);
+    Room.find.mockResolvedValue([]);
 
     clientSocket.emit('joinRoom', { pin: '9999', user: 'TestUser' }, (response) => {
-      expect(response.error).toBe('Sala no encontrada o inactiva');
+      expect(response.error).toBe('Sala no encontrada o PIN incorrecto');
       done();
     });
   });
 
   test('sendMessage - success', (done) => {
-    const mockRoom = { _id: 'room123', pin: '1234', type: 'TEXT', isActive: true };
-    Room.findOne.mockResolvedValue(mockRoom);
+    const mockRoom = { 
+      _id: 'room123', 
+      pin: 'hashed_1234', 
+      type: 'TEXT', 
+      isActive: true,
+      comparePin: jest.fn().mockResolvedValue(true)
+    };
+    Room.find.mockResolvedValue([mockRoom]);
 
     // Mock del worker para validateJoin
     const { Worker } = require('worker_threads');

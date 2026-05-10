@@ -3,7 +3,8 @@ const Message = require('../models/Message')
 const File = require('../models/File')
 
 const generatePin = () => {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
+  // Generar un PIN numérico de 6 dígitos (ej: 012345 a 999999)
+  return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
 exports.createRoom = async (req, res) => {
@@ -16,8 +17,14 @@ exports.createRoom = async (req, res) => {
         .json({ error: 'El nombre de la sala es obligatorio' })
     }
 
-    const pin = generatePin()
-
+    let pin = generatePin()
+    
+    // Verificar unicidad del PIN (aunque es improbable la colisión)
+    // Nota: Como el PIN está hasheado, no podemos buscarlo directamente.
+    // Sin embargo, para la creación, generamos uno nuevo. 
+    // Si hubiera un índice de unicidad en la BD sobre el campo hasheado,
+    // el 'save' fallaría si el hash coincide (lo cual es aún más improbable).
+    
     const newRoom = new Room({
       name,
       pin,
@@ -26,9 +33,16 @@ exports.createRoom = async (req, res) => {
 
     const savedRoom = await newRoom.save()
 
+    // Devolvemos el PIN en plano solo al crearla para que el admin lo vea
     res.status(201).json({
       message: 'Sala creada exitosamente',
-      room: savedRoom,
+      room: {
+        _id: savedRoom._id,
+        name: savedRoom.name,
+        pin: pin, // PIN en texto plano para el admin
+        type: savedRoom.type,
+        isActive: savedRoom.isActive
+      },
     })
   } catch (error) {
     res
@@ -68,9 +82,20 @@ exports.getRoomMessages = async (req, res) => {
   try {
     const { pin } = req.params
 
-    const room = await Room.findOne({ pin, isActive: true })
+    // Como el PIN está encriptado, debemos buscar todas las salas activas y comparar
+    const rooms = await Room.find({ isActive: true })
+    let room = null
+    
+    for (const r of rooms) {
+      const isMatch = await r.comparePin(pin)
+      if (isMatch) {
+        room = r
+        break
+      }
+    }
+
     if (!room) {
-      return res.status(404).json({ error: 'Sala no encontrada o inactiva' })
+      return res.status(404).json({ error: 'Sala no encontrada o PIN incorrecto' })
     }
 
     // Buscar mensajes de la sala
