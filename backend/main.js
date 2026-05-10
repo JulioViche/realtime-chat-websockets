@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 const http = require('http')
 const { Server } = require('socket.io')
 const path = require('path')
+const { Worker } = require('worker_threads')
 require('dotenv').config()
 
 const app = express()
@@ -45,6 +46,22 @@ const File = require('./models/File') // Por si hay mensajes con archivos
 // 💡 DICCIONARIO EN RAM: socket.id -> { user, roomId }
 const usuariosConectados = new Map()
 
+// Función auxiliar para ejecutar tareas en un hilo independiente (Worker Thread)
+function runSocketWorker(action, payload) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'workers/socketWorker.js'))
+    worker.postMessage({ action, payload })
+    worker.on('message', (msg) => {
+      resolve(msg.result)
+      worker.terminate()
+    })
+    worker.on('error', (err) => {
+      reject(err)
+      worker.terminate()
+    })
+  })
+}
+
 // Lógica de Sockets
 io.on('connection', (socket) => {
   console.log('Un usuario se ha conectado:', socket.id)
@@ -62,24 +79,18 @@ io.on('connection', (socket) => {
       const userIp = socket.handshake.address
       console.log(`Intentando unir usuario: ${user} desde IP: ${userIp}, force: ${force}`)
       
-      let existingSession = null
-      let isDuplicateName = false
+      const roomIdStr = room._id.toString()
 
-      // Buscar si la IP o el Nombre ya existen
-      usuariosConectados.forEach((val, key) => {
-        if (key === socket.id) return
-        
-        if (val.ip === userIp) {
-          existingSession = { id: key, user: val.user, roomId: val.roomId }
-        }
-        
-        if (val.roomId === room._id.toString() && val.user === user) {
-          isDuplicateName = true
-        }
+      // B. VALIDACIÓN EN HILO INDEPENDIENTE (Refactorizado a Worker Thread)
+      const { existingSession, isDuplicateName } = await runSocketWorker('validateJoin', {
+        usuarios: Array.from(usuariosConectados.entries()),
+        socketId: socket.id,
+        userIp,
+        roomId: roomIdStr,
+        user
       })
 
       // Si hay conflicto de IP y NO se ha pedido forzar la entrada
-      // y no es simplemente el mismo usuario reconectándose
       if (existingSession && !force && existingSession.user !== user) {
         if (callback) callback({ 
           error: 'session_conflict', 
@@ -97,23 +108,22 @@ io.on('connection', (socket) => {
         }
         usuariosConectados.delete(existingSession.id)
         // Notificar cambio de la sala de la sesión vieja si es distinta
-        if (existingSession.roomId !== room._id.toString()) {
+        if (existingSession.roomId !== roomIdStr) {
            enviarListaUsuarios(existingSession.roomId)
         }
       }
 
-      // Validar nombre duplicado (solo si no es el mismo que acabamos de expulsar)
+      // Validar nombre duplicado
       if (isDuplicateName && (!existingSession || existingSession.user !== user)) {
         if (callback) callback({ error: 'El nombre ya está en uso en esta sala' })
         return
       }
 
       // C. Si todo está bien, lo unimos al túnel y lo guardamos en RAM
-      const roomIdStr = room._id.toString()
       socket.join(roomIdStr)
       usuariosConectados.set(socket.id, { user, roomId: roomIdStr, ip: userIp })
       
-      console.log(`Socket ${socket.id} (${user}) se unió a la sala ${pin}`)
+      console.log(`Socket ${socket.id} (${user}) se unió a la sala ${pin} (Validado en Worker)`)
       
       // Enviar lista actualizada de usuarios a todos en la sala
       enviarListaUsuarios(roomIdStr)
@@ -122,6 +132,7 @@ io.on('connection', (socket) => {
       if (callback) callback({ success: true, roomType: room.type, roomId: roomIdStr })
 
     } catch (error) {
+      console.error('Error en joinRoom:', error)
       if (callback) callback({ error: 'Error del servidor' })
     }
   })
@@ -179,15 +190,17 @@ io.on('connection', (socket) => {
   })
 })
 
-// Función auxiliar para obtener y enviar la lista de usuarios de una sala
-function enviarListaUsuarios(roomId) {
-  const lista = []
-  usuariosConectados.forEach((val) => {
-    if (val.roomId === roomId) {
-      lista.push(val.user)
-    }
-  })
-  io.to(roomId).emit('userListUpdate', lista)
+// Función auxiliar para obtener y enviar la lista de usuarios de una sala (Usa Worker Thread)
+async function enviarListaUsuarios(roomId) {
+  try {
+    const lista = await runSocketWorker('filterUsers', {
+      usuarios: Array.from(usuariosConectados.entries()),
+      roomId
+    })
+    io.to(roomId).emit('userListUpdate', lista)
+  } catch (error) {
+    console.error('Error en enviarListaUsuarios:', error)
+  }
 }
 
 const PORT = process.env.PORT || 3000

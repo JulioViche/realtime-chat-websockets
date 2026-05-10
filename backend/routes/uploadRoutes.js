@@ -1,6 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
+const { Worker } = require('worker_threads')
 
 const router = express.Router()
 
@@ -22,11 +23,33 @@ router.post('/', upload.single('file'), (req, res) => {
     return res.status(400).json({ error: 'No se subió ningún archivo' })
   }
 
-  // Devolvemos la URL accesible (asumiendo que express.static expone /uploads)
-  res.status(200).json({
-    message: 'Archivo subido correctamente',
-    url: `/uploads/${req.file.filename}`,
-    file: req.file,
+  // Delegar el "procesamiento pesado" a un Worker Thread
+  const worker = new Worker(path.join(__dirname, '../workers/fileWorker.js'))
+  
+  worker.postMessage({
+    filename: req.file.filename,
+    originalname: req.file.originalname,
+    path: req.file.path
+  })
+
+  worker.on('message', (result) => {
+    if (result.success) {
+      res.status(200).json({
+        message: 'Archivo subido y procesado en hilo independiente',
+        url: `/uploads/${req.file.filename}`,
+        file: req.file,
+        workerInfo: result
+      })
+    } else {
+      res.status(500).json({ error: 'Error procesando el archivo' })
+    }
+    worker.terminate()
+  })
+
+  worker.on('error', (err) => {
+    console.error('Worker error:', err)
+    res.status(500).json({ error: 'Error interno en el worker de archivos' })
+    worker.terminate()
   })
 })
 
