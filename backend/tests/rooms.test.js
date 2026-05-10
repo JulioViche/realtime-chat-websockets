@@ -1,0 +1,109 @@
+const request = require('supertest');
+const express = require('express');
+const mongoose = require('mongoose');
+const roomRoutes = require('../routes/roomRoutes');
+const Room = require('../models/Room');
+const Message = require('../models/Message');
+
+const app = express();
+app.use(express.json());
+app.use('/api/rooms', roomRoutes);
+
+// Mock de Mongoose para evitar conexión real a BD durante el test unitario
+jest.mock('../models/Room');
+jest.mock('../models/Message');
+jest.mock('../models/File');
+
+describe('Room Controller - Unit Tests', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('POST /api/rooms - Éxito al crear una sala', async () => {
+    const mockRoom = {
+      _id: 'room_id_123',
+      name: 'Sala Test',
+      pin: 'TEST12',
+      type: 'TEXT'
+    };
+
+    Room.prototype.save = jest.fn().mockResolvedValue(mockRoom);
+
+    const response = await request(app)
+      .post('/api/rooms')
+      .send({ name: 'Sala Test', type: 'TEXT' });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.message).toBe('Sala creada exitosamente');
+    expect(response.body.room).toHaveProperty('pin');
+  });
+
+  test('POST /api/rooms - Error si falta el nombre', async () => {
+    const response = await request(app)
+      .post('/api/rooms')
+      .send({ type: 'TEXT' });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.error).toBe('El nombre de la sala es obligatorio');
+  });
+
+  test('GET /api/rooms/:pin/messages - Error si la sala no existe', async () => {
+    Room.findOne.mockResolvedValue(null);
+
+    const response = await request(app).get('/api/rooms/NONEXIST/messages');
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body.error).toBe('Sala no encontrada o inactiva');
+  });
+
+  test('GET /api/rooms/:pin/messages - Éxito al obtener mensajes', async () => {
+    const mockRoom = { _id: 'room_id_123', type: 'TEXT', pin: '123456', isActive: true };
+    const mockMessages = [
+      { _id: 'msg1', content: 'Hola', type: 'TEXT', toObject: () => ({ content: 'Hola', type: 'TEXT' }) }
+    ];
+
+    Room.findOne.mockResolvedValue(mockRoom);
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(mockMessages)
+    });
+
+    const response = await request(app).get('/api/rooms/123456/messages');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.messages).toHaveLength(1);
+    expect(response.body.messages[0].content).toBe('Hola');
+  });
+
+  test('GET /api/rooms/:pin/messages - Éxito al obtener mensajes con archivos (MULTIMEDIA)', async () => {
+    const File = require('../models/File');
+    const mockRoom = { _id: 'room_id_123', type: 'MULTIMEDIA', pin: 'MEMES1', isActive: true };
+    const mockMessages = [
+      { 
+        _id: 'msg_file', 
+        content: 'ver archivo', 
+        type: 'FILE', 
+        toObject: function() { return { _id: this._id, content: this.content, type: this.type }; }
+      }
+    ];
+    const mockFile = { name: 'test.jpg', url: '/uploads/test.jpg', type: 'image/jpeg' };
+
+    Room.findOne.mockResolvedValue(mockRoom);
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(mockMessages)
+    });
+    File.findOne.mockResolvedValue(mockFile);
+
+    const response = await request(app).get('/api/rooms/MEMES1/messages');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.messages[0]).toHaveProperty('file');
+    expect(response.body.messages[0].file.name).toBe('test.jpg');
+  });
+
+  test('POST /api/rooms - Manejo de errores internos', async () => {
+    Room.prototype.save = jest.fn().mockRejectedValue(new Error('DB Error'));
+    const response = await request(app).post('/api/rooms').send({ name: 'Error' });
+    expect(response.statusCode).toBe(500);
+    expect(response.body.error).toBe('Error al crear la sala');
+  });
+});
