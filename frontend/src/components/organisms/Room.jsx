@@ -169,7 +169,13 @@ const Room = () => {
         }
       } catch (err) {
         console.error('Error subiendo archivo', err)
-        alert('Hubo un error al subir tu archivo.')
+        const errorMessage = err.response?.data?.error || 'Hubo un error al subir tu archivo.'
+        Swal.fire({
+          icon: 'error',
+          title: 'Error al subir archivo',
+          text: errorMessage,
+          confirmButtonColor: '#3b82f6'
+        })
         setUploadProgress(0)
         return // No enviar el mensaje si falló el archivo
       }

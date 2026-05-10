@@ -18,7 +18,24 @@ const MessageForm = ({ onSendMessage, allowFiles = false }) => {
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+      
+      // Validar tamaño (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('El archivo es demasiado grande. El límite es 10MB.')
+        e.target.value = null
+        return
+      }
+
+      // Validar tipo
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf']
+      if (!allowedTypes.includes(file.type)) {
+        alert('Solo se permiten imágenes (JPG, PNG, GIF) y archivos PDF.')
+        e.target.value = null
+        return
+      }
+
+      setSelectedFile(file)
     }
   }
 
