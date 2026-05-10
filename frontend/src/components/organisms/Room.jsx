@@ -41,16 +41,26 @@ const Room = () => {
           if (response.error === 'session_conflict') {
             setLoading(false)
             Swal.fire({
-              icon: 'warning',
-              title: 'Sesión activa detectada',
-              text: `Ya tienes una sesión activa en este dispositivo como "${response.existingUser}". ¿Deseas continuar en esta pestaña con ese usuario, o usar el nuevo nombre y cerrar la otra sesión?`,
+              icon: 'question',
+              title: '¡Ya estás conectado!',
+              text: `Tienes una sesión abierta como "${response.existingUser}" en este dispositivo. Elige cómo deseas continuar:`,
               showCancelButton: true,
               showDenyButton: true,
-              confirmButtonText: `Usar viejo (${response.existingUser})`,
-              denyButtonText: `Usar nuevo (${usernameToUse})`,
-              cancelButtonText: 'Cancelar',
-              confirmButtonColor: '#3085d6',
-              denyButtonColor: '#2563eb',
+              confirmButtonText: `Continuar como "${response.existingUser}"`,
+              denyButtonText: `Entrar como "${usernameToUse}" (Cerrar otra)`,
+              cancelButtonText: 'Cancelar y volver al inicio',
+              confirmButtonColor: '#3b82f6', // Azul principal
+              denyButtonColor: '#f59e0b',    // Naranja advertencia/cambio
+              cancelButtonColor: '#ef4444',  // Rojo suave
+              buttonsStyling: false,         // Desactivar estilos por defecto para usar Tailwind
+              customClass: {
+                container: 'font-sans',
+                popup: 'rounded-2xl shadow-xl',
+                actions: 'flex flex-col gap-3 w-full mt-4 px-4',
+                confirmButton: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors duration-200',
+                denyButton: 'w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors duration-200',
+                cancelButton: 'w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-colors duration-200'
+              }
             }).then((result) => {
               if (result.isConfirmed) {
                 // Toma control con el usuario viejo
@@ -68,9 +78,10 @@ const Room = () => {
             setLoading(false)
             Swal.fire({
               icon: 'error',
-              title: 'Acceso Denegado',
+              title: '¡Ups! No pudimos dejarte entrar',
               text: response.error,
-              confirmButtonColor: '#2563eb'
+              confirmButtonText: 'Volver al inicio',
+              confirmButtonColor: '#3b82f6' // Azul estándar
             }).then(() => {
               handleLeaveRoom()
             })
@@ -101,9 +112,10 @@ const Room = () => {
     socketRef.current.on('force_disconnect', (msg) => {
       Swal.fire({
         icon: 'info',
-        title: 'Sesión cerrada',
-        text: msg,
-        confirmButtonColor: '#2563eb'
+        title: 'Sesión movida',
+        text: 'Tu sesión fue cerrada en esta pestaña porque ingresaste desde otra. ¡Sigue chateando por allá!',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#3b82f6'
       }).then(() => {
         handleLeaveRoom()
       })
