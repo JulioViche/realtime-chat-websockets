@@ -37,6 +37,33 @@ exports.createRoom = async (req, res) => {
   }
 }
 
+exports.getAllRooms = async (req, res) => {
+  try {
+    const rooms = await Room.find().sort({ createdAt: -1 })
+    res.status(200).json(rooms)
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener las salas', details: error.message })
+  }
+}
+
+exports.deleteRoom = async (req, res) => {
+  try {
+    const { id } = req.params
+    const deletedRoom = await Room.findByIdAndDelete(id)
+
+    if (!deletedRoom) {
+      return res.status(404).json({ error: 'Sala no encontrada' })
+    }
+
+    // Opcional: También podríamos borrar los mensajes asociados si quisiéramos limpieza total
+    await Message.deleteMany({ roomId: id })
+
+    res.status(200).json({ message: 'Sala eliminada exitosamente' })
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar la sala', details: error.message })
+  }
+}
+
 exports.getRoomMessages = async (req, res) => {
   try {
     const { pin } = req.params

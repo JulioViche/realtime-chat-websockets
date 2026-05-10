@@ -1,6 +1,15 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
+
+// Mock del middleware antes de requerir las rutas
+jest.mock('../middlewares/authMiddleware', () => ({
+  verifyAdminToken: (req, res, next) => {
+    req.admin = { role: 'admin' };
+    next();
+  }
+}));
+
 const roomRoutes = require('../routes/roomRoutes');
 const Room = require('../models/Room');
 const Message = require('../models/Message');
@@ -105,5 +114,27 @@ describe('Room Controller - Unit Tests', () => {
     const response = await request(app).post('/api/rooms').send({ name: 'Error' });
     expect(response.statusCode).toBe(500);
     expect(response.body.error).toBe('Error al crear la sala');
+  });
+
+  test('GET /api/rooms - Éxito al obtener todas las salas', async () => {
+    const mockRooms = [{ name: 'S1' }, { name: 'S2' }];
+    Room.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(mockRooms)
+    });
+
+    const response = await request(app).get('/api/rooms');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveLength(2);
+  });
+
+  test('DELETE /api/rooms/:id - Éxito al eliminar sala', async () => {
+    Room.findByIdAndDelete.mockResolvedValue({ _id: '123' });
+    Message.deleteMany.mockResolvedValue({});
+
+    const response = await request(app).delete('/api/rooms/123');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.message).toBe('Sala eliminada exitosamente');
   });
 });
