@@ -1,29 +1,23 @@
 const { parentPort } = require('worker_threads')
 
-parentPort.on('message', (task) => {
-  const { action, payload } = task
-
+module.exports = ({ action, payload }) => {
   if (action === 'validateJoin') {
     const { usuarios, socketId, userIp, roomId, user } = payload
     let existingSession = null
     let isDuplicateName = false
 
-    // usuarios is an array of [id, {user, roomId, ip}]
     for (const [id, val] of usuarios) {
-      if (id === socketId) continue
-
-      if (val.ip === userIp) {
+      // 1. Validar si ya hay una sesión de esa IP en este cuarto
+      if (val.ip === userIp && val.roomId === roomId && id !== socketId) {
         existingSession = { id, user: val.user, roomId: val.roomId }
+        break
       }
-
-      if (val.roomId === roomId && val.user === user) {
+      // 2. Validar si el nombre ya existe en este cuarto
+      if (val.user === user && val.roomId === roomId && id !== socketId) {
         isDuplicateName = true
       }
     }
-    parentPort.postMessage({
-      action: 'validateJoinResult',
-      result: { existingSession, isDuplicateName },
-    })
+    return { existingSession, isDuplicateName }
   }
 
   if (action === 'filterUsers') {
@@ -31,18 +25,14 @@ parentPort.on('message', (task) => {
     const lista = usuarios
       .filter(([id, val]) => val.roomId === roomId)
       .map(([id, val]) => val.user)
-    parentPort.postMessage({ action: 'filterUsersResult', result: lista })
+    return lista
   }
 
   if (action === 'processMessage') {
     const { messageData, user } = payload
-    // Simulamos procesamiento pesado o formateo
-    const processedMessage = {
-      ...messageData,
-      user, // Aseguramos el usuario desde la sesión
-      processedAt: new Date().toISOString(),
-      isWorkerProcessed: true
-    }
-    parentPort.postMessage({ action: 'processMessageResult', result: processedMessage })
+    // Simular procesamiento pesado
+    return { ...messageData, user, isWorkerProcessed: true }
   }
-})
+
+  return null
+}

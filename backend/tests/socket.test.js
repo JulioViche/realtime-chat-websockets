@@ -29,16 +29,32 @@ jest.mock('../models/Message', () => {
 const Room = require('../models/Room');
 const Message = require('../models/Message');
 
-// Mock de Worker Threads para que no lancen hilos reales en el test unitario de sockets
+// Mock de Piscina para evitar hilos reales en tests
+jest.mock('piscina', () => {
+  return jest.fn().mockImplementation(() => ({
+    run: jest.fn().mockImplementation(async ({ action, payload }) => {
+      // Simular la lógica de socketWorker.js
+      if (action === 'validateJoin') {
+        return { existingSession: null, isDuplicateName: false };
+      }
+      if (action === 'filterUsers') {
+        return payload.usuarios
+          .filter(([id, val]) => val.roomId === payload.roomId)
+          .map(([id, val]) => val.user);
+      }
+      if (action === 'processMessage') {
+        return { ...payload.messageData, user: payload.user, isWorkerProcessed: true };
+      }
+      return null;
+    })
+  }));
+});
+
+// Mock de Worker Threads (por si acaso otras partes lo usan)
 jest.mock('worker_threads', () => ({
   Worker: jest.fn().mockImplementation(() => ({
     postMessage: jest.fn(),
-    on: jest.fn((event, cb) => {
-        // Simular respuesta inmediata del worker para los tests
-        if (event === 'message') {
-            // Esto se sobreescribirá en los tests específicos si es necesario
-        }
-    }),
+    on: jest.fn(),
     terminate: jest.fn(),
   })),
 }));
@@ -87,18 +103,6 @@ describe('WebSocket Integration Tests', () => {
     };
     Room.find.mockResolvedValue([mockRoom]);
 
-    // Mock del worker para validateJoin
-    const { Worker } = require('worker_threads');
-    Worker.mockImplementationOnce(() => ({
-        postMessage: jest.fn(),
-        on: jest.fn((event, cb) => {
-            if (event === 'message') {
-                cb({ result: { existingSession: null, isDuplicateName: false } });
-            }
-        }),
-        terminate: jest.fn(),
-    }));
-
     clientSocket.emit('joinRoom', { pin: '1234', user: 'TestUser' }, (response) => {
       expect(response.success).toBe(true);
       expect(response.roomType).toBe('TEXT');
@@ -125,18 +129,6 @@ describe('WebSocket Integration Tests', () => {
     };
     Room.find.mockResolvedValue([mockRoom]);
 
-    // Mock del worker para validateJoin
-    const { Worker } = require('worker_threads');
-    Worker.mockImplementationOnce(() => ({
-        postMessage: jest.fn(),
-        on: jest.fn((event, cb) => {
-            if (event === 'message') {
-                cb({ result: { existingSession: null, isDuplicateName: false } });
-            }
-        }),
-        terminate: jest.fn(),
-    }));
-
     // Nos unimos de verdad para que el socket esté en el cuarto de Socket.io
     clientSocket.emit('joinRoom', { pin: '1234', user: 'TestUser' }, (joinResponse) => {
       expect(joinResponse.success).toBe(true);
@@ -155,43 +147,14 @@ describe('WebSocket Integration Tests', () => {
   });
 
   test('sendMessage - high load (uses worker)', (done) => {
-    const { Worker } = require('worker_threads');
-    
     // Simular muchos usuarios conectados
     for (let i = 0; i < 10; i++) {
       usuariosConectados.set(`fake_id_${i}`, { user: `User${i}`, roomId: 'room123' });
     }
 
-    // Mock del worker para validateJoin (cuando el cliente se une)
-    Worker.mockImplementationOnce(() => ({
-        postMessage: jest.fn(),
-        on: jest.fn((event, cb) => {
-            if (event === 'message') {
-                cb({ result: { existingSession: null, isDuplicateName: false } });
-            }
-        }),
-        terminate: jest.fn(),
-    }));
-
     clientSocket.emit('joinRoom', { pin: '1234', user: 'TestUser' }, (joinResponse) => {
       // Ahora hay > 5 usuarios, sendMessage debería usar el worker
       
-      // Mock del worker para processMessage
-      Worker.mockImplementationOnce(() => ({
-        postMessage: jest.fn(),
-        on: jest.fn((event, cb) => {
-            if (event === 'message') {
-                cb({ result: { 
-                  roomId: 'room123', 
-                  content: 'High Load Message', 
-                  user: 'TestUser',
-                  isWorkerProcessed: true 
-                } });
-            }
-        }),
-        terminate: jest.fn(),
-      }));
-
       const mockSavedMessage = { _id: 'msgHighLoad', save: jest.fn().mockResolvedValue({ _id: 'msgHighLoad' }) };
       Message.mockImplementation(() => mockSavedMessage);
 

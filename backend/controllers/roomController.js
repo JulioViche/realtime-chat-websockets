@@ -1,11 +1,13 @@
 const Room = require('../models/Room')
 const Message = require('../models/Message')
 const File = require('../models/File')
+const Piscina = require('piscina')
+const path = require('path')
 
-const generatePin = () => {
-  // Generar un PIN numérico de 6 dígitos (ej: 012345 a 999999)
-  return Math.floor(100000 + Math.random() * 900000).toString()
-}
+// Pool de hilos persistente para operaciones de salas (bcrypt y generación de PIN)
+const roomPool = new Piscina({
+  filename: path.join(__dirname, '../workers/roomWorker.js')
+})
 
 exports.createRoom = async (req, res) => {
   try {
@@ -17,13 +19,8 @@ exports.createRoom = async (req, res) => {
         .json({ error: 'El nombre de la sala es obligatorio' })
     }
 
-    let pin = generatePin()
-    
-    // Verificar unicidad del PIN (aunque es improbable la colisión)
-    // Nota: Como el PIN está hasheado, no podemos buscarlo directamente.
-    // Sin embargo, para la creación, generamos uno nuevo. 
-    // Si hubiera un índice de unicidad en la BD sobre el campo hasheado,
-    // el 'save' fallaría si el hash coincide (lo cual es aún más improbable).
+    // Delegar generación de PIN al worker
+    const pin = await roomPool.run({ action: 'generatePin' })
     
     const newRoom = new Room({
       name,
@@ -82,24 +79,20 @@ exports.getRoomMessages = async (req, res) => {
   try {
     const { pin } = req.params
 
-    // Como el PIN está encriptado, debemos buscar todas las salas activas y comparar
-    const rooms = await Room.find({ isActive: true })
-    let room = null
+    // Como el PIN está encriptado, delegamos la comparación masiva al worker
+    const rooms = await Room.find({ isActive: true }).select('_id pin type')
     
-    for (const r of rooms) {
-      const isMatch = await r.comparePin(pin)
-      if (isMatch) {
-        room = r
-        break
-      }
-    }
+    const roomMatched = await roomPool.run({ 
+      action: 'verifyRoomPin', 
+      payload: { pin, rooms } 
+    })
 
-    if (!room) {
+    if (!roomMatched) {
       return res.status(404).json({ error: 'Sala no encontrada o PIN incorrecto' })
     }
 
     // Buscar mensajes de la sala
-    const messages = await Message.find({ roomId: room._id }).sort({ createdAt: 1 })
+    const messages = await Message.find({ roomId: roomMatched._id }).sort({ createdAt: 1 })
 
     // Como algunos mensajes pueden tener archivos adjuntos, los buscamos
     // En MongoDB podemos hacer esto manualmente o con agregaciones. Lo haremos manualmente para que sea fácil de entender.
@@ -120,7 +113,7 @@ exports.getRoomMessages = async (req, res) => {
     }))
 
     res.status(200).json({
-      roomType: room.type,
+      roomType: roomMatched.type,
       messages: messagesWithFiles
     })
   } catch (error) {

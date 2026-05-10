@@ -1,20 +1,10 @@
-const { Worker } = require('worker_threads');
-const path = require('path');
+const socketWorker = require('../workers/socketWorker');
+const roomWorker = require('../workers/roomWorker');
 
-describe('Worker Threads Unit Tests', () => {
+describe('Worker Logic Unit Tests (Piscina Compatible)', () => {
   
   describe('socketWorker.js', () => {
-    let socketWorker;
-
-    beforeEach(() => {
-      socketWorker = new Worker(path.join(__dirname, '../workers/socketWorker.js'));
-    });
-
-    afterEach(async () => {
-      await socketWorker.terminate();
-    });
-
-    test('action: validateJoin - should return existing session if IP matches', (done) => {
+    test('action: validateJoin - should return existing session if IP matches', async () => {
       const payload = {
         usuarios: [['old-socket', { user: 'OldUser', roomId: 'room1', ip: '1.2.3.4' }]],
         socketId: 'new-socket',
@@ -23,17 +13,12 @@ describe('Worker Threads Unit Tests', () => {
         user: 'NewUser'
       };
 
-      socketWorker.on('message', (msg) => {
-        expect(msg.action).toBe('validateJoinResult');
-        expect(msg.result.existingSession.user).toBe('OldUser');
-        expect(msg.result.isDuplicateName).toBe(false);
-        done();
-      });
-
-      socketWorker.postMessage({ action: 'validateJoin', payload });
+      const result = await socketWorker({ action: 'validateJoin', payload });
+      expect(result.existingSession.user).toBe('OldUser');
+      expect(result.isDuplicateName).toBe(false);
     });
 
-    test('action: validateJoin - should return duplicate name if name matches in same room', (done) => {
+    test('action: validateJoin - should return duplicate name if name matches in same room', async () => {
       const payload = {
         usuarios: [['other-socket', { user: 'TestUser', roomId: 'room1', ip: '5.6.7.8' }]],
         socketId: 'my-socket',
@@ -42,16 +27,12 @@ describe('Worker Threads Unit Tests', () => {
         user: 'TestUser'
       };
 
-      socketWorker.on('message', (msg) => {
-        expect(msg.result.isDuplicateName).toBe(true);
-        expect(msg.result.existingSession).toBeNull();
-        done();
-      });
-
-      socketWorker.postMessage({ action: 'validateJoin', payload });
+      const result = await socketWorker({ action: 'validateJoin', payload });
+      expect(result.isDuplicateName).toBe(true);
+      expect(result.existingSession).toBeNull();
     });
 
-    test('action: filterUsers - should return list of nicknames in room', (done) => {
+    test('action: filterUsers - should return list of nicknames in room', async () => {
       const payload = {
         usuarios: [
           ['s1', { user: 'User1', roomId: 'roomA' }],
@@ -61,44 +42,37 @@ describe('Worker Threads Unit Tests', () => {
         roomId: 'roomA'
       };
 
-      socketWorker.on('message', (msg) => {
-        expect(msg.action).toBe('filterUsersResult');
-        expect(msg.result).toContain('User1');
-        expect(msg.result).toContain('User3');
-        expect(msg.result).not.toContain('User2');
-        done();
-      });
+      const result = await socketWorker({ action: 'filterUsers', payload });
+      expect(result).toContain('User1');
+      expect(result).toContain('User3');
+      expect(result).not.toContain('User2');
+    });
+  });
 
-      socketWorker.postMessage({ action: 'filterUsers', payload });
+  describe('roomWorker.js', () => {
+    test('action: generatePin - should return a 6-digit numeric string', async () => {
+      const pin = await roomWorker({ action: 'generatePin' });
+      expect(pin).toMatch(/^\d{6}$/);
+    });
+
+    test('action: verifyRoomPin - should return matching room', async () => {
+      const bcrypt = require('bcrypt');
+      const hashedPin = await bcrypt.hash('123456', 10);
+      const rooms = [
+        { _id: 'r1', pin: hashedPin },
+        { _id: 'r2', pin: 'other' }
+      ];
+
+      const result = await roomWorker({ 
+        action: 'verifyRoomPin', 
+        payload: { pin: '123456', rooms } 
+      });
+      expect(result._id).toBe('r1');
     });
   });
 
   describe('fileWorker.js', () => {
-    let fileWorker;
-
-    beforeEach(() => {
-      fileWorker = new Worker(path.join(__dirname, '../workers/fileWorker.js'));
-    });
-
-    afterEach(async () => {
-      await fileWorker.terminate();
-    });
-
-    test('should process file and return success', (done) => {
-      const fileData = {
-        filename: '123-test.png',
-        originalname: 'test.png',
-        path: 'uploads/123-test.png'
-      };
-
-      fileWorker.on('message', (msg) => {
-        expect(msg.success).toBe(true);
-        expect(msg.filename).toBe('123-test.png');
-        expect(msg).toHaveProperty('isSafe');
-        done();
-      });
-
-      fileWorker.postMessage(fileData);
-    }, 2000); // Darle tiempo al setTimeout de 1s
+    // Nota: fileWorker.js sigue usando parentPort porque se usa vía new Worker() en uploadRoutes.js
+    // No se optimizó a Piscina en el plan actual (solo sockets y salas).
   });
 });

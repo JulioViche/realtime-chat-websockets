@@ -4,6 +4,7 @@ const http = require('http')
 const { Server } = require('socket.io')
 const path = require('path')
 const { Worker } = require('worker_threads')
+const Piscina = require('piscina')
 require('dotenv').config()
 
 const app = express()
@@ -50,20 +51,19 @@ const inactivityTimers = new Map()
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutos
 const HIGH_LOAD_THRESHOLD = 5 // Umbral para activar procesamiento en Worker
 
-// Función auxiliar para ejecutar tareas en un hilo independiente (Worker Thread)
-function runSocketWorker(action, payload) {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(path.join(__dirname, 'workers/socketWorker.js'))
-    worker.postMessage({ action, payload })
-    worker.on('message', (msg) => {
-      resolve(msg.result)
-      worker.terminate()
-    })
-    worker.on('error', (err) => {
-      reject(err)
-      worker.terminate()
-    })
-  })
+// Pool de hilos persistente para operaciones de Sockets
+const socketPool = new Piscina({
+  filename: path.join(__dirname, 'workers/socketWorker.js')
+})
+
+// Función auxiliar para ejecutar tareas en el pool de hilos persistente
+async function runSocketWorker(action, payload) {
+  try {
+    return await socketPool.run({ action, payload })
+  } catch (error) {
+    console.error('Error in socketPool:', error)
+    throw error
+  }
 }
 
 // Función para gestionar el timeout por inactividad

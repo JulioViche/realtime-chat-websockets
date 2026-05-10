@@ -10,6 +10,20 @@ jest.mock('../middlewares/authMiddleware', () => ({
   }
 }));
 
+// Mock de Piscina para evitar hilos reales en tests
+jest.mock('piscina', () => {
+  return jest.fn().mockImplementation(() => ({
+    run: jest.fn().mockImplementation(async ({ action, payload }) => {
+      if (action === 'generatePin') return '123456';
+      if (action === 'verifyRoomPin') {
+        if (!payload.rooms || payload.rooms.length === 0) return null;
+        return { _id: 'room_id_123', type: 'TEXT' }; 
+      }
+      return null;
+    })
+  }));
+});
+
 const roomRoutes = require('../routes/roomRoutes');
 const Room = require('../models/Room');
 const Message = require('../models/Message');
@@ -57,7 +71,9 @@ describe('Room Controller - Unit Tests', () => {
   });
 
   test('GET /api/rooms/:pin/messages - Error si la sala no existe', async () => {
-    Room.find.mockResolvedValue([]);
+    Room.find.mockReturnValue({
+      select: jest.fn().mockResolvedValue([])
+    });
 
     const response = await request(app).get('/api/rooms/NONEXIST/messages');
 
@@ -77,7 +93,9 @@ describe('Room Controller - Unit Tests', () => {
       { _id: 'msg1', content: 'Hola', type: 'TEXT', toObject: () => ({ content: 'Hola', type: 'TEXT' }) }
     ];
 
-    Room.find.mockResolvedValue([mockRoom]);
+    Room.find.mockReturnValue({
+      select: jest.fn().mockResolvedValue([mockRoom])
+    });
     Message.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockMessages)
     });
@@ -108,7 +126,9 @@ describe('Room Controller - Unit Tests', () => {
     ];
     const mockFile = { name: 'test.jpg', url: '/uploads/test.jpg', type: 'image/jpeg' };
 
-    Room.find.mockResolvedValue([mockRoom]);
+    Room.find.mockReturnValue({
+      select: jest.fn().mockResolvedValue([mockRoom])
+    });
     Message.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockMessages)
     });
