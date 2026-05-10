@@ -48,6 +48,7 @@ const usuariosConectados = new Map()
 // DICCIONARIO PARA TIMEOUTS: socket.id -> timerId
 const inactivityTimers = new Map()
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutos
+const HIGH_LOAD_THRESHOLD = 5 // Umbral para activar procesamiento en Worker
 
 // Función auxiliar para ejecutar tareas en un hilo independiente (Worker Thread)
 function runSocketWorker(action, payload) {
@@ -172,14 +173,28 @@ io.on('connection', (socket) => {
       // Resetear timer de inactividad al enviar mensaje
       resetInactivityTimer(socket)
 
+      let mensajeEmitir
+
+      // REFACTORIZACIÓN: Si la carga es alta (> HIGH_LOAD_THRESHOLD), procesamos vía Worker Thread
+      if (usuariosConectados.size > HIGH_LOAD_THRESHOLD) {
+        console.log(`[Carga Alta] Procesando mensaje en Worker. Usuarios: ${usuariosConectados.size}`)
+        mensajeEmitir = await runSocketWorker('processMessage', {
+          messageData: data,
+          user: session.user
+        })
+      } else {
+        mensajeEmitir = { ...data, user: session.user }
+      }
+
       // Guardar el mensaje en Mongo
       const nuevoMensaje = new Message({
-        roomId: data.roomId,
-        user: session.user, // Lo sacamos de la RAM, no de lo que mande el frontend (más seguro)
-        content: data.content,
-        type: data.file ? 'FILE' : 'TEXT'
+        roomId: mensajeEmitir.roomId,
+        user: mensajeEmitir.user,
+        content: mensajeEmitir.content,
+        type: mensajeEmitir.file ? 'FILE' : 'TEXT'
       })
       const mensajeGuardado = await nuevoMensaje.save()
+      mensajeEmitir._id = mensajeGuardado._id
 
       // Guardar el archivo en Mongo si existe
       if (data.file) {
@@ -193,11 +208,10 @@ io.on('connection', (socket) => {
       }
 
       // Emitir el mensaje final a toda la sala
-      const mensajeEmitir = { ...data, _id: mensajeGuardado._id, user: session.user }
-      io.to(data.roomId).emit('newMessage', mensajeEmitir)
+      io.to(mensajeEmitir.roomId).emit('newMessage', mensajeEmitir)
 
     } catch (error) {
-      console.error('Error guardando mensaje:', error)
+      console.error('Error enviando mensaje:', error)
     }
   })
 
@@ -238,4 +252,8 @@ async function enviarListaUsuarios(roomId) {
 
 const PORT = process.env.PORT || 3000
 // ATENCIÓN: Ahora levantamos 'server', no 'app'
-server.listen(PORT, () => console.log(`Servidor (con Sockets) corriendo en puerto ${PORT}`))
+if (require.main === module) {
+  server.listen(PORT, () => console.log(`Servidor (con Sockets) corriendo en puerto ${PORT}`))
+}
+
+module.exports = { app, server, io, usuariosConectados, inactivityTimers }

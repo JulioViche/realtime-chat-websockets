@@ -33,4 +33,16 @@ parentPort.on('message', (task) => {
       .map(([id, val]) => val.user)
     parentPort.postMessage({ action: 'filterUsersResult', result: lista })
   }
+
+  if (action === 'processMessage') {
+    const { messageData, user } = payload
+    // Simulamos procesamiento pesado o formateo
+    const processedMessage = {
+      ...messageData,
+      user, // Aseguramos el usuario desde la sesión
+      processedAt: new Date().toISOString(),
+      isWorkerProcessed: true
+    }
+    parentPort.postMessage({ action: 'processMessageResult', result: processedMessage })
+  }
 })

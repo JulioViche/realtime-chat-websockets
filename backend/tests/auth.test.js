@@ -23,7 +23,7 @@ describe('Auth Controller - Unit Tests', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty('token');
-    expect(response.body.message).toBe('Autenticación exitosa');
+    expect(response.body.message).toBe('Autenticación exitosa (procesada en hilo independiente)');
     
     // Verificar que el token sea válido
     const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);

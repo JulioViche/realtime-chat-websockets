@@ -1,47 +1,66 @@
+# ⚙️ Backend API - Real-Time Chat System
+
+Este es el núcleo del sistema de chat, construido con **Node.js**, **Express** y **Socket.io**. Implementa una arquitectura orientada a la eficiencia y seguridad, utilizando hilos independientes para tareas pesadas y gestión de sesiones en memoria RAM.
+
+## 🚀 Características Técnicas Avanzadas
+
+### 1. Gestión de Concurrencia con Worker Threads
+Para asegurar que el bucle de eventos (Event Loop) de Node.js nunca se bloquee, las tareas que requieren iteración o procesamiento se delegan a hilos independientes:
+- **`socketWorker.js`**: Maneja la validación de sesiones duplicadas por IP y el filtrado de listas de usuarios.
+- **`fileWorker.js`**: Procesa las subidas de archivos (simulación de escaneo y procesamiento) fuera del hilo principal.
+
+### 2. Validaciones de Seguridad en Multer
+El sistema de subida de archivos es estricto para prevenir abusos:
+- **Límite de tamaño:** 10MB por archivo.
+- **Filtro de tipos:** Solo se permiten imágenes (`jpg`, `jpeg`, `png`, `gif`) y documentos `pdf`.
+- **Manejo de Errores:** Respuestas claras al cliente cuando se violan las restricciones.
+
+### 3. Sesiones en RAM y Timeout por Inactividad
+- **Eficiencia:** Las sesiones activas se mantienen en un `Map` en RAM para validaciones instantáneas sin consultas constantes a la base de datos.
+- **Seguridad:** Implementa un **Timeout de 30 minutos**. Si un usuario no interactúa (enviar mensajes o archivos), el servidor lo desconecta automáticamente para liberar recursos.
+
+### 4. Comunicación en Tiempo Real
+- Uso de **Socket.io** con soporte para salas (Rooms) privadas.
+- Eventos personalizados para desconexión forzada (sesión movida) y timeout por inactividad.
 
 ---
 
+## 🛠️ Desarrollo y Pruebas
 
-**Documentación de contenedores Docker:**
-Consulta la guía en [../docs/containers.md](../docs/containers.md)
-
-# Inicio del backend Node.js con Express
-
-1. Abre una terminal en la carpeta `backend`.
-2. Ejecuta:
-
-```
-npm init -y
-npm install express mongoose dotenv
+### Instalación
+```bash
+npm install
 ```
 
-3. Crea un archivo `index.js` con el siguiente contenido básico:
-
-```js
-const express = require('express');
-const mongoose = require('mongoose');
-require('dotenv').config();
-
-const app = express();
-app.use(express.json());
-
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error(err));
-
-app.get('/', (req, res) => {
-  res.send('API funcionando');
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+### Ejecución
+```bash
+# Modo desarrollo (requiere configurar .env)
+node main.js
 ```
 
-4. Crea un archivo `.env` con:
+### Suite de Pruebas (Jest)
+Se ha implementado una cobertura exhaustiva que incluye:
+- **Unitarias:** Controladores de salas y autenticación.
+- **Integración WebSocket:** Pruebas de conexión, unión a salas y mensajería en tiempo real.
+- **Workers:** Verificación de la lógica off-loaded en hilos independientes.
+- **Uploads:** Validación de las restricciones de Multer.
 
-```
-MONGO_URI=mongodb://admin:admin@localhost:27017/
-PORT=3000
+Para ejecutar todos los tests:
+```bash
+npm test
 ```
 
-¿Quieres que cree estos archivos automáticamente en la carpeta backend?
+Para ver la cobertura:
+```bash
+npm test -- --coverage
+```
+
+---
+
+## 📁 Estructura del Proyecto
+- `/controllers`: Lógica de negocio para las rutas API.
+- `/models`: Esquemas de Mongoose (MongoDB).
+- `/routes`: Definición de endpoints REST.
+- `/workers`: Scripts diseñados para ejecutarse en `Worker Threads`.
+- `/tests`: Suite completa de pruebas unitarias e integración.
+- `/uploads`: Directorio local para almacenamiento temporal de archivos.
