@@ -33,29 +33,59 @@ const Room = () => {
     // 1. Conectar Socket
     socketRef.current = io('http://localhost:3000')
 
-    // 2. Intentar unirse a la sala
-    socketRef.current.emit(
-      'joinRoom',
-      { pin, user: myNickname },
-      (response) => {
-        if (response.error) {
-          setLoading(false)
-          Swal.fire({
-            icon: 'error',
-            title: 'Acceso Denegado',
-            text: response.error,
-            confirmButtonColor: '#2563eb'
-          }).then(() => {
-            handleLeaveRoom()
-          })
-        } else {
-          setRoomType(response.roomType)
-          setRoomId(response.roomId)
-          // 3. Si tuvo éxito, cargar el historial de mensajes vía HTTP
-          fetchHistory()
+    const attemptJoin = (usernameToUse, force = false) => {
+      socketRef.current.emit(
+        'joinRoom',
+        { pin, user: usernameToUse, force },
+        (response) => {
+          if (response.error === 'session_conflict') {
+            setLoading(false)
+            Swal.fire({
+              icon: 'warning',
+              title: 'Sesión activa detectada',
+              text: `Ya tienes una sesión activa en este dispositivo como "${response.existingUser}". ¿Deseas continuar en esta pestaña con ese usuario, o usar el nuevo nombre y cerrar la otra sesión?`,
+              showCancelButton: true,
+              showDenyButton: true,
+              confirmButtonText: `Usar viejo (${response.existingUser})`,
+              denyButtonText: `Usar nuevo (${usernameToUse})`,
+              cancelButtonText: 'Cancelar',
+              confirmButtonColor: '#3085d6',
+              denyButtonColor: '#2563eb',
+            }).then((result) => {
+              if (result.isConfirmed) {
+                // Toma control con el usuario viejo
+                localStorage.setItem('userNickname', response.existingUser)
+                window.location.reload()
+              } else if (result.isDenied) {
+                // Fuerza la conexión con el nuevo usuario
+                setLoading(true)
+                attemptJoin(usernameToUse, true)
+              } else {
+                handleLeaveRoom()
+              }
+            })
+          } else if (response.error) {
+            setLoading(false)
+            Swal.fire({
+              icon: 'error',
+              title: 'Acceso Denegado',
+              text: response.error,
+              confirmButtonColor: '#2563eb'
+            }).then(() => {
+              handleLeaveRoom()
+            })
+          } else {
+            setRoomType(response.roomType)
+            setRoomId(response.roomId)
+            // 3. Si tuvo éxito, cargar el historial de mensajes vía HTTP
+            fetchHistory()
+          }
         }
-      }
-    )
+      )
+    }
+
+    // 2. Intentar unirse a la sala
+    attemptJoin(myNickname, false)
 
     // 4. Escuchar nuevos mensajes en tiempo real
     socketRef.current.on('newMessage', (data) => {
@@ -65,6 +95,18 @@ const Room = () => {
     // 5. Escuchar actualizaciones de la lista de usuarios
     socketRef.current.on('userListUpdate', (users) => {
       setOnlineUsers(users)
+    })
+
+    // 6. Escuchar desconexión forzada
+    socketRef.current.on('force_disconnect', (msg) => {
+      Swal.fire({
+        icon: 'info',
+        title: 'Sesión cerrada',
+        text: msg,
+        confirmButtonColor: '#2563eb'
+      }).then(() => {
+        handleLeaveRoom()
+      })
     })
 
     // Limpieza al desmontar (cuando el usuario se va)

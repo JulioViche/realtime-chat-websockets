@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
   console.log('Un usuario se ha conectado:', socket.id)
 
   // 1. Cuando el usuario intenta entrar a la sala
-  socket.on('joinRoom', async ({ pin, user }, callback) => {
+  socket.on('joinRoom', async ({ pin, user, force }, callback) => {
     try {
       // A. Validar que la sala exista en BD
       const room = await Room.findOne({ pin, isActive: true })
@@ -59,26 +59,52 @@ io.on('connection', (socket) => {
         return
       }
 
-      // B. Validar que el nombre (user) no esté siendo usado en esa misma sala
-      // Y validar que no haya otra sesión activa desde la misma IP (Requisito 3.1.3)
       const userIp = socket.handshake.address
+      console.log(`Intentando unir usuario: ${user} desde IP: ${userIp}, force: ${force}`)
+      
+      let existingSession = null
       let isDuplicateName = false
-      let isDuplicateIp = false
 
-      usuariosConectados.forEach((val) => {
-        if (val.roomId === room._id.toString()) {
-          if (val.user === user) isDuplicateName = true
+      // Buscar si la IP o el Nombre ya existen
+      usuariosConectados.forEach((val, key) => {
+        if (key === socket.id) return
+        
+        if (val.ip === userIp) {
+          existingSession = { id: key, user: val.user, roomId: val.roomId }
         }
-        if (val.ip === userIp) isDuplicateIp = true
+        
+        if (val.roomId === room._id.toString() && val.user === user) {
+          isDuplicateName = true
+        }
       })
 
-      if (isDuplicateName) {
-        if (callback) callback({ error: 'El nombre ya está en uso en esta sala' })
+      // Si hay conflicto de IP y NO se ha pedido forzar la entrada
+      // y no es simplemente el mismo usuario reconectándose
+      if (existingSession && !force && existingSession.user !== user) {
+        if (callback) callback({ 
+          error: 'session_conflict', 
+          existingUser: existingSession.user 
+        })
         return
       }
 
-      if (isDuplicateIp) {
-        if (callback) callback({ error: 'Ya tienes una sesión activa desde este dispositivo' })
+      // Si se pide forzar (o es la misma IP pero queremos cambiar/reusar) o es reconexión
+      if (existingSession && (force || existingSession.user === user)) {
+        const oldSocket = io.sockets.sockets.get(existingSession.id)
+        if (oldSocket) {
+          oldSocket.emit('force_disconnect', 'Se ha iniciado sesión en otra pestaña.')
+          oldSocket.disconnect(true)
+        }
+        usuariosConectados.delete(existingSession.id)
+        // Notificar cambio de la sala de la sesión vieja si es distinta
+        if (existingSession.roomId !== room._id.toString()) {
+           enviarListaUsuarios(existingSession.roomId)
+        }
+      }
+
+      // Validar nombre duplicado (solo si no es el mismo que acabamos de expulsar)
+      if (isDuplicateName && (!existingSession || existingSession.user !== user)) {
+        if (callback) callback({ error: 'El nombre ya está en uso en esta sala' })
         return
       }
 
