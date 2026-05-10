@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import axios from 'axios'
+import Swal from 'sweetalert2'
 
 import MessageForm from '../molecules/MessageForm'
 import RoomHeader from '../molecules/RoomHeader'
@@ -9,6 +10,7 @@ import MessageBubble from '../molecules/MessageBubble'
 
 const Room = () => {
   const { pin } = useParams()
+  const navigate = useNavigate()
   const [messages, setMessages] = useState([])
   const [roomType, setRoomType] = useState('TEXT') // 'TEXT' o 'MULTIMEDIA'
   const [roomId, setRoomId] = useState(null)
@@ -24,7 +26,7 @@ const Room = () => {
 
   useEffect(() => {
     if (!myNickname) {
-      window.location.href = '/'
+      navigate('/')
       return
     }
 
@@ -37,8 +39,15 @@ const Room = () => {
       { pin, user: myNickname },
       (response) => {
         if (response.error) {
-          setError(response.error)
           setLoading(false)
+          Swal.fire({
+            icon: 'error',
+            title: 'Acceso Denegado',
+            text: response.error,
+            confirmButtonColor: '#2563eb'
+          }).then(() => {
+            handleLeaveRoom()
+          })
         } else {
           setRoomType(response.roomType)
           setRoomId(response.roomId)

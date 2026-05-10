@@ -60,22 +60,32 @@ io.on('connection', (socket) => {
       }
 
       // B. Validar que el nombre (user) no esté siendo usado en esa misma sala
-      let isDuplicate = false
+      // Y validar que no haya otra sesión activa desde la misma IP (Requisito 3.1.3)
+      const userIp = socket.handshake.address
+      let isDuplicateName = false
+      let isDuplicateIp = false
+
       usuariosConectados.forEach((val) => {
-        if (val.roomId === room._id.toString() && val.user === user) {
-          isDuplicate = true
+        if (val.roomId === room._id.toString()) {
+          if (val.user === user) isDuplicateName = true
         }
+        if (val.ip === userIp) isDuplicateIp = true
       })
 
-      if (isDuplicate) {
+      if (isDuplicateName) {
         if (callback) callback({ error: 'El nombre ya está en uso en esta sala' })
+        return
+      }
+
+      if (isDuplicateIp) {
+        if (callback) callback({ error: 'Ya tienes una sesión activa desde este dispositivo' })
         return
       }
 
       // C. Si todo está bien, lo unimos al túnel y lo guardamos en RAM
       const roomIdStr = room._id.toString()
       socket.join(roomIdStr)
-      usuariosConectados.set(socket.id, { user, roomId: roomIdStr })
+      usuariosConectados.set(socket.id, { user, roomId: roomIdStr, ip: userIp })
       
       console.log(`Socket ${socket.id} (${user}) se unió a la sala ${pin}`)
       
