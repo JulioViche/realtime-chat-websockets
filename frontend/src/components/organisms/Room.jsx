@@ -12,6 +12,7 @@ const Room = () => {
   const [messages, setMessages] = useState([])
   const [roomType, setRoomType] = useState('TEXT') // 'TEXT' o 'MULTIMEDIA'
   const [roomId, setRoomId] = useState(null)
+  const [onlineUsers, setOnlineUsers] = useState([])
   
   // Estados UI
   const [loading, setLoading] = useState(true)
@@ -50,6 +51,11 @@ const Room = () => {
     // 4. Escuchar nuevos mensajes en tiempo real
     socketRef.current.on('newMessage', (data) => {
       setMessages((prev) => [...prev, data])
+    })
+
+    // 5. Escuchar actualizaciones de la lista de usuarios
+    socketRef.current.on('userListUpdate', (users) => {
+      setOnlineUsers(users)
     })
 
     // Limpieza al desmontar (cuando el usuario se va)
@@ -153,7 +159,7 @@ const Room = () => {
       <RoomHeader
         roomName={`Sala PIN: ${pin}`}
         pin={pin}
-        onlineCount={'Activo'}
+        onlineCount={`${onlineUsers.length} conectados`}
         onLeave={handleLeaveRoom}
       />
 
@@ -163,6 +169,19 @@ const Room = () => {
           Subiendo archivo: {uploadProgress}%
         </div>
       )}
+
+      {/* Sección de usuarios conectados */}
+      <div className="bg-white border-b px-6 py-2 flex items-center space-x-2 overflow-x-auto no-scrollbar">
+        <span className="text-xs font-bold text-gray-400 uppercase">En línea:</span>
+        {onlineUsers.map((user, idx) => (
+          <span 
+            key={idx} 
+            className={`text-sm px-2 py-0.5 rounded-full ${user === myNickname ? 'bg-blue-100 text-blue-700 font-bold' : 'bg-gray-100 text-gray-600'}`}
+          >
+            {user}
+          </span>
+        ))}
+      </div>
 
       <main className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 ? (

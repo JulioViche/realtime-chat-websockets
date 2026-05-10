@@ -79,6 +79,9 @@ io.on('connection', (socket) => {
       
       console.log(`Socket ${socket.id} (${user}) se unió a la sala ${pin}`)
       
+      // Enviar lista actualizada de usuarios a todos en la sala
+      enviarListaUsuarios(roomIdStr)
+
       // Respondemos con éxito para que React lo deje entrar visualmente
       if (callback) callback({ success: true, roomType: room.type, roomId: roomIdStr })
 
@@ -127,11 +130,29 @@ io.on('connection', (socket) => {
 
   // 3. Cuando el usuario cierra la pestaña o pierde WiFi
   socket.on('disconnect', () => {
-    // Borramos su nombre de la memoria RAM automáticamente
-    usuariosConectados.delete(socket.id)
-    console.log('Usuario desconectado y limpiado de memoria:', socket.id)
+    const session = usuariosConectados.get(socket.id)
+    if (session) {
+      const roomIdStr = session.roomId
+      // Borramos su nombre de la memoria RAM automáticamente
+      usuariosConectados.delete(socket.id)
+      console.log('Usuario desconectado y limpiado de memoria:', socket.id)
+      
+      // Notificar a los demás que la lista cambió
+      enviarListaUsuarios(roomIdStr)
+    }
   })
 })
+
+// Función auxiliar para obtener y enviar la lista de usuarios de una sala
+function enviarListaUsuarios(roomId) {
+  const lista = []
+  usuariosConectados.forEach((val) => {
+    if (val.roomId === roomId) {
+      lista.push(val.user)
+    }
+  })
+  io.to(roomId).emit('userListUpdate', lista)
+}
 
 const PORT = process.env.PORT || 3000
 // ATENCIÓN: Ahora levantamos 'server', no 'app'
