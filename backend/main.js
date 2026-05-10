@@ -45,6 +45,9 @@ const File = require('./models/File') // Por si hay mensajes con archivos
 
 // 💡 DICCIONARIO EN RAM: socket.id -> { user, roomId }
 const usuariosConectados = new Map()
+// DICCIONARIO PARA TIMEOUTS: socket.id -> timerId
+const inactivityTimers = new Map()
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutos
 
 // Función auxiliar para ejecutar tareas en un hilo independiente (Worker Thread)
 function runSocketWorker(action, payload) {
@@ -60,6 +63,23 @@ function runSocketWorker(action, payload) {
       worker.terminate()
     })
   })
+}
+
+// Función para gestionar el timeout por inactividad
+function resetInactivityTimer(socket) {
+  // Limpiar timer anterior si existe
+  if (inactivityTimers.has(socket.id)) {
+    clearTimeout(inactivityTimers.get(socket.id))
+  }
+
+  // Establecer nuevo timer
+  const timerId = setTimeout(() => {
+    console.log(`Socket ${socket.id} desconectado por inactividad`)
+    socket.emit('inactivity_timeout', 'Has sido desconectado por inactividad prolongada.')
+    socket.disconnect(true)
+  }, INACTIVITY_TIMEOUT)
+
+  inactivityTimers.set(socket.id, timerId)
 }
 
 // Lógica de Sockets
@@ -123,6 +143,9 @@ io.on('connection', (socket) => {
       socket.join(roomIdStr)
       usuariosConectados.set(socket.id, { user, roomId: roomIdStr, ip: userIp })
       
+      // Iniciar timer de inactividad
+      resetInactivityTimer(socket)
+
       console.log(`Socket ${socket.id} (${user}) se unió a la sala ${pin} (Validado en Worker)`)
       
       // Enviar lista actualizada de usuarios a todos en la sala
@@ -145,6 +168,9 @@ io.on('connection', (socket) => {
       if (!session || session.roomId !== data.roomId) {
         return // Ignorar el mensaje si es un intruso que no pasó por joinRoom
       }
+
+      // Resetear timer de inactividad al enviar mensaje
+      resetInactivityTimer(socket)
 
       // Guardar el mensaje en Mongo
       const nuevoMensaje = new Message({
@@ -178,6 +204,13 @@ io.on('connection', (socket) => {
   // 3. Cuando el usuario cierra la pestaña o pierde WiFi
   socket.on('disconnect', () => {
     const session = usuariosConectados.get(socket.id)
+    
+    // Limpiar timer de inactividad
+    if (inactivityTimers.has(socket.id)) {
+      clearTimeout(inactivityTimers.get(socket.id))
+      inactivityTimers.delete(socket.id)
+    }
+
     if (session) {
       const roomIdStr = session.roomId
       // Borramos su nombre de la memoria RAM automáticamente

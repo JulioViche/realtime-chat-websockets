@@ -121,6 +121,19 @@ const Room = () => {
       })
     })
 
+    // 7. Escuchar timeout por inactividad
+    socketRef.current.on('inactivity_timeout', (msg) => {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sesión expirada',
+        text: msg,
+        confirmButtonText: 'Volver al inicio',
+        confirmButtonColor: '#3b82f6'
+      }).then(() => {
+        handleLeaveRoom()
+      })
+    })
+
     // Limpieza al desmontar (cuando el usuario se va)
     return () => {
       socketRef.current.disconnect()
