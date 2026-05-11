@@ -92,11 +92,18 @@ exports.getRoomMessages = async (req, res) => {
     const { pin } = req.params
 
     // Como el PIN está encriptado, delegamos la comparación masiva al worker
-    const rooms = await Room.find({ isActive: true }).select('_id pin type')
-    
-    const roomMatched = await roomPool.run({ 
-      action: 'verifyRoomPin', 
-      payload: { pin, rooms } 
+    // Usamos .lean() para obtener objetos planos de JS que se serializan bien hacia el worker
+    const rooms = await Room.find({ isActive: true }).select('_id pin type').lean()
+
+    // Convert ObjectId to string before sending to worker to avoid DataCloneError
+    const roomsForWorker = rooms.map((room) => ({
+      ...room,
+      _id: room._id?.toString()
+    }))
+
+    const roomMatched = await roomPool.run({
+      action: 'verifyRoomPin',
+      payload: { pin, rooms: roomsForWorker }
     })
 
     if (!roomMatched) {
@@ -129,6 +136,7 @@ exports.getRoomMessages = async (req, res) => {
       messages: messagesWithFiles
     })
   } catch (error) {
+    console.error('ERROR AL OBTENER MENSAJES:', error)
     res.status(500).json({ error: 'Error al obtener mensajes', details: error.message })
   }
 }

@@ -2,7 +2,12 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
-const PIN_PEPPER = process.env.PIN_PEPPER || 'default-pepper-cambiar-en-produccion';
+const PIN_PEPPER = process.env.PIN_PEPPER;
+
+if (!PIN_PEPPER) {
+  console.error('❌ ERROR FATAL: La variable PIN_PEPPER no está definida en el archivo .env');
+  process.exit(1);
+}
 
 const roomSchema = new mongoose.Schema(
   {

@@ -1,96 +1,125 @@
-# 💬 Real-Time Chat System
+# 💬 Sistema de Chat en Tiempo Real con Salas Seguras
 
-![Estado: En proceso](https://img.shields.io/badge/Estado-En%20proceso-yellow)
-![Versión: 1.0](https://img.shields.io/badge/Versi%C3%B3n-1.0-blue)
-![Stack: MERN](https://img.shields.io/badge/Stack-MERN-orange)
+![Estado](https://img.shields.io/badge/Estado-Completado-success)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.0-blue)
+![Stack](https://img.shields.io/badge/Stack-MERN-orange)
 
-Un sistema de mensajería en tiempo real simple, eficiente y ultraligero construido con la pila **MERN** (MongoDB, Express, React, Node.js) y WebSockets. Este proyecto permite la comunicación inmediata a través de salas interactivas, con soporte para transferencia de archivos multimedia y validación de usuarios en memoria RAM, lo que garantiza baja latencia.
+## 📌 1. Descripción del Proyecto
 
-## 🚀 Características Principales
+Este proyecto es un aplicativo web de chat en tiempo real diseñado bajo un enfoque de **sistemas distribuidos y concurrentes**. Permite la creación y gestión de salas de conversación seguras por parte de un administrador, con acceso controlado para los usuarios finales mediante PINs únicos. 
 
-- **Comunicación en Tiempo Real:** Intercambio de mensajes bidireccional casi instantáneo a través de Socket.io.
-- **Salas Aisladas:** Sistema de salas (Rooms) con control de acceso por medio de un PIN único.
-- **Validación en Memoria (RAM):** Control estricto de usuarios conectados en cada sala sin recargar la base de datos, garantizando identidades únicas por sala.
-- **Soporte Multimedia:** Transferencia de imágenes y archivos a través de un sistema unificado usando Axios (con barras de carga) y servido estáticamente.
-- **Auditoría Persistente:** Historial de mensajes y archivos permanentemente guardados en MongoDB.
+El sistema garantiza una **comunicación bidireccional instantánea** (baja latencia) mediante WebSockets, empleando **Worker Threads** (Hilos) en el servidor para evitar bloqueos durante tareas pesadas como la autenticación o el procesamiento masivo de mensajes.
+
+### Características Principales:
+*   **Gestión Centralizada:** Un administrador autenticado puede crear salas de tipo **Texto** o **Multimedia**.
+*   **Acceso Anónimo pero Seguro:** Los usuarios ingresan con un PIN y un Nickname (sin registro previo).
+*   **Prevención de Suplantación:** Mecanismo estricto de sesión única por IP/Dispositivo.
+*   **Soporte Multimedia:** Transferencia de imágenes y documentos PDF con visualización y barra de progreso.
+*   **Concurrencia:** Uso intensivo de hilos (`piscina`, `worker_threads`) para garantizar escalabilidad.
 
 ---
 
-## 🛠️ Configuración e Instalación del Proyecto
+## 🏗️ 2. Arquitectura del Sistema
 
-### 1. Clonar el repositorio
+El proyecto sigue una arquitectura **Cliente-Servidor** separada en dos capas principales, comunicadas a través de una API RESTful y un túnel WebSocket persistente.
 
-```bash
-git clone <url-del-repositorio>
-cd proy-1
-```
+*   **Frontend (Cliente):** React.js + Vite + TailwindCSS.
+*   **Backend (Servidor):** Node.js + Express.js + Socket.io.
+*   **Base de Datos:** MongoDB (Persistencia de mensajes, configuración de salas y almacenamiento de credenciales hasheadas con `bcrypt`).
 
-### 2. Configuración de Variables de Entorno
+### 📊 Diagramas y Modelos
+Para un detalle exhaustivo del diseño del sistema, consulta los siguientes documentos en la carpeta `/docs`:
+1.  📄 **[Modelo de Datos y Reglas de Negocio](./docs/datamodel/datamodel.md)**
+2.  🐳 **[Arquitectura de Contenedores (Docker)](./docs/containers.md)**
+3.  📋 **[Documento Original de Requisitos](./docs/requisitos.md)**
 
-En el directorio `backend/`, crea o localiza el archivo `.env`. Las siguientes variables son requeridas por el sistema:
+---
 
-| Variable     | Descripción                                                   |
-| ------------ | ------------------------------------------------------------- |
-| `PORT`       | El puerto donde se ejecutará el backend (ej. 3000)            |
-| `MONGO_URI`  | Cadena de conexión hacia tu instancia de MongoDB              |
-| `JWT_SECRET` | Llave secreta para firmar los JSON Web Tokens administrativos |
-| `ADMIN_USER` | Nombre de usuario para acceder al panel de administración     |
-| `ADMIN_PASS` | Contraseña para el usuario administrador                      |
+## ⚙️ 3. Requisitos Previos
 
-> **Nota de Seguridad:** No expongas los valores de este archivo en el código fuente. Usa un archivo `.env` o gestor de secretos en tu entorno de producción.
+Para ejecutar este proyecto en un entorno local, necesitas tener instalado:
+*   **Node.js** (v18.0 o superior).
+*   **MongoDB** (Instalación local como servicio de Windows o mediante contenedor Docker en el puerto `27017`).
+*   **Git** (Para clonar el repositorio).
 
-### 3. Instalación de Dependencias
+---
 
-Para el **Backend**:
+## 🚀 4. Instalación y Despliegue Local
 
+Sigue estos pasos cuidadosamente para levantar ambos entornos (Backend y Frontend).
+
+### Paso 4.1: Configuración del Backend (Servidor)
+1. Abre una terminal y dirígete a la carpeta del backend:
+   ```bash
+   cd backend
+   ```
+2. Instala las dependencias necesarias:
+   ```bash
+   npm install
+   ```
+3. Crea un archivo `.env` en la raíz de la carpeta `backend` con la siguiente configuración:
+   ```env
+   PORT=3000
+   MONGO_URI=mongodb://localhost:27017/realtime-chat
+   JWT_SECRET=tu_clave_secreta_aqui
+   ADMIN_USER=admin
+   ADMIN_PASS=admin123
+   PIN_PEPPER=clave_secreta_para_huellas
+   ```
+4. Inicia el servidor:
+   ```bash
+   node main.js
+   ```
+   *(Deberías ver los mensajes: "Servidor corriendo en puerto 3000" y "MongoDB connected").*
+
+### Paso 4.2: Configuración del Frontend (Cliente)
+1. Abre **otra** pestaña de terminal y dirígete a la carpeta del frontend:
+   ```bash
+   cd frontend
+   ```
+2. Instala las dependencias:
+   ```bash
+   npm install
+   ```
+3. Levanta el servidor de desarrollo:
+   ```bash
+   npm run dev
+   ```
+4. Abre tu navegador web en la dirección indicada (usualmente `http://localhost:5173`).
+
+---
+
+## 📖 5. Guía de Uso
+
+### Para el Administrador (Creación de Salas)
+1. Ve a `http://localhost:5173/admin` en tu navegador.
+2. Inicia sesión con las credenciales definidas en tu `.env` (Ej. Usuario: `admin`, Clave: `admin123`).
+3. En el **Panel de Control**, haz clic en **"Nueva Sala"**.
+4. Define un nombre, escribe un **PIN numérico (Mínimo 4 dígitos)**, y elige el tipo de sala (Texto o Multimedia).
+5. **¡Importante!** Comparte el PIN que acabas de escribir con los usuarios. Por seguridad criptográfica, el sistema no guardará el PIN en texto plano para mostrarlo después.
+
+### Para el Usuario Final (Chatear)
+1. Ve a la página principal `http://localhost:5173/`.
+2. Ingresa el **PIN** que te proporcionó el administrador.
+3. Elige un **Nickname** (debe ser único en esa sala).
+4. Haz clic en "Unirse a la sala".
+5. Si la sala es **Multimedia**, verás un icono de "Clip" para adjuntar imágenes o PDFs (Límite: 10MB).
+6. Al cerrar la pestaña, tu sesión se liberará automáticamente.
+
+---
+
+## 🧪 6. Pruebas Unitarias (Testing)
+El backend cuenta con una suite de pruebas automatizadas (Jest) que verifican la lógica de negocio, concurrencia de WebSockets y manejo de errores.
+
+Para ejecutarlas:
 ```bash
 cd backend
-npm install
+npm test
 ```
-
-Para el **Frontend**:
-
+Para ver el porcentaje de cobertura de código (Coverage > 70%):
 ```bash
-cd frontend
-npm install
+npm test -- --coverage
 ```
 
-### 4. Semilla de Datos (Opcional)
-
-Puedes popular tu base de datos rápidamente con salas y mensajes de prueba ejecutando la semilla en el backend:
-
-```bash
-cd backend
-node seed.js
-```
-
-_(Esto limpiará tus datos actuales y preparará las salas `123456` y `MEMES1`)_.
-
 ---
-
-## 📚 Documentación Técnica y Arquitectura
-
-El diseño arquitectónico y de despliegue del sistema está documentado en detalle en la carpeta `/docs`. Te recomendamos consultar los siguientes archivos para un profundo entendimiento de la lógica del negocio:
-
-- 📊 **[Modelo de Datos (Data Model)](./docs/datamodel/datamodel.md):** Contiene las reglas del negocio, el esquema de colecciones en MongoDB y el Diagrama Entidad-Relación (ER) centrado en el almacenamiento eficiente sin tablas de sesiones rígidas.
-- 🐳 **[Arquitectura de Contenedores](./docs/containers/containers.md):** Documentación sobre la orquestación, red interna, Docker, Docker Compose y el ciclo de vida del despliegue en entornos de producción.
-
----
-
-## 💻 Módulos del Sistema
-
-Este es un monorepositorio que divide el sistema en dos capas especializadas. Cada capa cuenta con su propia documentación detallada y comandos específicos de desarrollo:
-
-### ⚙️ [Backend API (Servidor Node.js)](./backend/README.md)
-
-Responsable de servir la API RESTful administrativa, gestionar el túnel bidireccional de Socket.io, manejar el almacenamiento de archivos (Multer) y comunicarse con el clúster MongoDB.
-
-### 🎨 [Frontend UI (Cliente React/Vite)](./frontend/README.md)
-
-Aplicación SPA moderna que consume el backend. Cuenta con diseño responsivo, enrutamiento dinámico, progreso de subida de archivos y renderizado reactivo del historial de chat.
-
----
-
-<div align="center">
-  <p>Construido con dedicación para el curso de <b>Aplicaciones Distribuidas</b>.</p>
-</div>
+*Desarrollado para la materia de Aplicaciones Distribuidas - 2026*
