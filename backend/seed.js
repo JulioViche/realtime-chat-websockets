@@ -4,6 +4,7 @@ require('dotenv').config()
 const Room = require('./models/Room')
 const Message = require('./models/Message')
 const File = require('./models/File')
+const Admin = require('./models/Admin')
 
 const seedDatabase = async () => {
   try {
@@ -17,6 +18,16 @@ const seedDatabase = async () => {
     await File.deleteMany({})
     console.log('🗑️  Colecciones antiguas limpiadas.')
 
+    // Crear o refrescar admin de prueba con password hasheado por el modelo
+    if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
+      await Admin.deleteOne({ username: process.env.ADMIN_USER })
+      await Admin.create({
+        username: process.env.ADMIN_USER,
+        password: process.env.ADMIN_PASS,
+      })
+      console.log('🔐 Admin de prueba creado con contraseña hasheada.')
+    }
+
     // 3. Crear Salas (Rooms) iniciales
     const room1 = new Room({
       name: 'Sala General',
@@ -26,7 +37,7 @@ const seedDatabase = async () => {
 
     const room2 = new Room({
       name: 'Sala de Memes',
-      pin: 'MEMES1',
+      pin: '654321',
       type: 'MULTIMEDIA',
     })
 

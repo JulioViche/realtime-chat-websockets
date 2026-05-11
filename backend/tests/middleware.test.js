@@ -1,5 +1,6 @@
 const { verifyAdminToken } = require('../middlewares/authMiddleware');
 const jwt = require('jsonwebtoken');
+const { clearRevokedTokens, revokeToken } = require('../utils/tokenBlocklist');
 
 // Mock de variables de entorno
 process.env.JWT_SECRET = 'test_secret';
@@ -17,6 +18,7 @@ describe('Auth Middleware - Unit Tests', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    clearRevokedTokens();
   });
 
   test('should return 401 if no authorization header is provided', () => {
@@ -78,6 +80,19 @@ describe('Auth Middleware - Unit Tests', () => {
 
     expect(next).toHaveBeenCalled();
     expect(req.admin).toMatchObject(adminData);
+    expect(req.token).toBe(validToken);
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  test('should return 401 if token was revoked on logout', () => {
+    const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    revokeToken(token);
+    req.headers.authorization = `Bearer ${token}`;
+
+    verifyAdminToken(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Token inválido o expirado' });
+    expect(next).not.toHaveBeenCalled();
   });
 });

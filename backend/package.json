@@ -4,8 +4,15 @@
   "description": "Puedes usar este comando para iniciar un contenedor de MongoDB:",
   "main": "main.js",
   "scripts": {
+    "start": "node main.js",
+    "load:test": "node scripts/loadTest50.js",
     "test": "jest --coverage",
     "test:watch": "jest --watchAll"
+  },
+  "jest": {
+    "setupFiles": [
+      "<rootDir>/tests/setupEnv.js"
+    ]
   },
   "keywords": [],
   "author": "",

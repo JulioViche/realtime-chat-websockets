@@ -37,7 +37,29 @@ jest.mock('../models/Room');
 jest.mock('../models/Message');
 jest.mock('../models/File');
 
+const mockRoomFind = (rooms) => {
+  Room.find.mockReturnValue({
+    select: jest.fn().mockReturnValue({
+      lean: jest.fn().mockResolvedValue(rooms),
+      sort: jest.fn().mockResolvedValue(rooms)
+    })
+  });
+};
+
 describe('Room Controller - Unit Tests', () => {
+  beforeEach(() => {
+    Room.findOne = jest.fn().mockResolvedValue(null);
+    Room.generatePinFingerprint = jest.fn((pin) => `fingerprint_${pin}`);
+    Room.decryptPin = jest.fn((encryptedPin) => {
+      if (!encryptedPin) return null;
+      return encryptedPin.replace('encrypted_', '');
+    });
+    Room.PIN_SECURITY_MODES = {
+      RECOVERABLE: 'RECOVERABLE',
+      NON_RECOVERABLE: 'NON_RECOVERABLE'
+    };
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -46,7 +68,8 @@ describe('Room Controller - Unit Tests', () => {
     const mockRoom = {
       _id: 'room_id_123',
       name: 'Sala Test',
-      pin: 'TEST12',
+      pinEncrypted: 'encrypted_1234',
+      pinSecurityMode: 'RECOVERABLE',
       type: 'TEXT'
     };
 
@@ -54,11 +77,52 @@ describe('Room Controller - Unit Tests', () => {
 
     const response = await request(app)
       .post('/api/rooms')
-      .send({ name: 'Sala Test', type: 'TEXT' });
+      .send({ name: 'Sala Test', pin: '1234', type: 'TEXT' });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.message).toBe('Sala creada exitosamente');
-    expect(response.body.room).toHaveProperty('pin');
+    expect(response.body.room.pin).toBe('1234');
+    expect(response.body.room.pinSecurityMode).toBe('RECOVERABLE');
+    expect(response.body.room.pinCanBeRecovered).toBe(true);
+  });
+
+  test('POST /api/rooms - Crea sala con PIN no recuperable', async () => {
+    const mockRoom = {
+      _id: 'room_id_123',
+      name: 'Sala Segura',
+      pinEncrypted: undefined,
+      pinSecurityMode: 'NON_RECOVERABLE',
+      type: 'TEXT'
+    };
+
+    Room.prototype.save = jest.fn().mockResolvedValue(mockRoom);
+
+    const response = await request(app)
+      .post('/api/rooms')
+      .send({
+        name: 'Sala Segura',
+        pin: '1234',
+        type: 'TEXT',
+        pinSecurityMode: 'NON_RECOVERABLE'
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.room.pin).toBeNull();
+    expect(response.body.room.pinSecurityMode).toBe('NON_RECOVERABLE');
+    expect(response.body.room.pinCanBeRecovered).toBe(false);
+  });
+
+  test('POST /api/rooms - Error con modo de seguridad inválido', async () => {
+    const response = await request(app)
+      .post('/api/rooms')
+      .send({
+        name: 'Sala Test',
+        pin: '1234',
+        pinSecurityMode: 'PLAIN_TEXT'
+      });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.error).toBe('Modo de seguridad del PIN inválido');
   });
 
   test('POST /api/rooms - Error si falta el nombre', async () => {
@@ -71,9 +135,7 @@ describe('Room Controller - Unit Tests', () => {
   });
 
   test('GET /api/rooms/:pin/messages - Error si la sala no existe', async () => {
-    Room.find.mockReturnValue({
-      select: jest.fn().mockResolvedValue([])
-    });
+    mockRoomFind([]);
 
     const response = await request(app).get('/api/rooms/NONEXIST/messages');
 
@@ -93,9 +155,7 @@ describe('Room Controller - Unit Tests', () => {
       { _id: 'msg1', content: 'Hola', type: 'TEXT', toObject: () => ({ content: 'Hola', type: 'TEXT' }) }
     ];
 
-    Room.find.mockReturnValue({
-      select: jest.fn().mockResolvedValue([mockRoom])
-    });
+    mockRoomFind([mockRoom]);
     Message.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockMessages)
     });
@@ -126,9 +186,7 @@ describe('Room Controller - Unit Tests', () => {
     ];
     const mockFile = { name: 'test.jpg', url: '/uploads/test.jpg', type: 'image/jpeg' };
 
-    Room.find.mockReturnValue({
-      select: jest.fn().mockResolvedValue([mockRoom])
-    });
+    mockRoomFind([mockRoom]);
     Message.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue(mockMessages)
     });
@@ -143,21 +201,69 @@ describe('Room Controller - Unit Tests', () => {
 
   test('POST /api/rooms - Manejo de errores internos', async () => {
     Room.prototype.save = jest.fn().mockRejectedValue(new Error('DB Error'));
-    const response = await request(app).post('/api/rooms').send({ name: 'Error' });
+    const response = await request(app)
+      .post('/api/rooms')
+      .send({ name: 'Error', pin: '1234' });
+
     expect(response.statusCode).toBe(500);
     expect(response.body.error).toBe('Error al crear la sala');
   });
 
   test('GET /api/rooms - Éxito al obtener todas las salas', async () => {
-    const mockRooms = [{ name: 'S1' }, { name: 'S2' }];
-    Room.find.mockReturnValue({
-      sort: jest.fn().mockResolvedValue(mockRooms)
-    });
+    const mockRooms = [
+      { name: 'S1', pin: 'hash', pinFingerprint: 'fp1', pinEncrypted: 'encrypted_1111', pinSecurityMode: 'RECOVERABLE' },
+      { name: 'S2', pin: 'hash', pinFingerprint: 'fp2', pinEncrypted: undefined, pinSecurityMode: 'NON_RECOVERABLE' }
+    ];
+    mockRoomFind(mockRooms);
 
     const response = await request(app).get('/api/rooms');
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveLength(2);
+    expect(response.body[0].pin).toBe('1111');
+    expect(response.body[0].pinCanBeRecovered).toBe(true);
+    expect(response.body[0].pinFingerprint).toBeUndefined();
+    expect(response.body[1].pin).toBeNull();
+    expect(response.body[1].pinCanBeRecovered).toBe(false);
+    expect(response.body[1].pinFingerprint).toBeUndefined();
+  });
+
+  test('DELETE /api/rooms/bulk - Éxito al eliminar salas seleccionadas', async () => {
+    mockRoomFind([{ _id: 'r1' }, { _id: 'r2' }]);
+    Room.deleteMany.mockResolvedValue({ deletedCount: 2 });
+    Message.deleteMany.mockResolvedValue({});
+
+    const response = await request(app)
+      .delete('/api/rooms/bulk')
+      .send({ ids: ['r1', 'r2'] });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.deletedCount).toBe(2);
+    expect(Room.deleteMany).toHaveBeenCalledWith({ _id: { $in: ['r1', 'r2'] } });
+    expect(Message.deleteMany).toHaveBeenCalledWith({ roomId: { $in: ['r1', 'r2'] } });
+  });
+
+  test('DELETE /api/rooms/bulk - Éxito al eliminar todas las salas', async () => {
+    mockRoomFind([{ _id: 'r1' }]);
+    Room.deleteMany.mockResolvedValue({ deletedCount: 1 });
+    Message.deleteMany.mockResolvedValue({});
+
+    const response = await request(app)
+      .delete('/api/rooms/bulk')
+      .send({ all: true });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.deletedCount).toBe(1);
+    expect(Room.find).toHaveBeenCalledWith({});
+  });
+
+  test('DELETE /api/rooms/bulk - Error si no hay salas seleccionadas', async () => {
+    const response = await request(app)
+      .delete('/api/rooms/bulk')
+      .send({ ids: [] });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.error).toBe('Selecciona al menos una sala para eliminar');
   });
 
   test('DELETE /api/rooms/:id - Éxito al eliminar sala', async () => {

@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-05-11T15:41:34.378Z",
+  "apiUrl": "http://127.0.0.1:3101",
+  "virtualUsers": 50,
+  "joinedUsers": 50,
+  "sentMessages": 50,
+  "expectedBroadcasts": 2500,
+  "receivedBroadcasts": 2500,
+  "joinLatency": {
+    "p50Ms": 5177,
+    "p95Ms": 5614,
+    "maxMs": 5705
+  },
+  "messageLatency": {
+    "p50Ms": 201,
+    "p95Ms": 265,
+    "maxMs": 271
+  },
+  "totalDurationMs": 6430,
+  "roomCreatedByScript": true,
+  "cleanup": {
+    "ok": true,
+    "status": 200,
+    "body": {
+      "message": "Sala eliminada exitosamente"
+    }
+  },
+  "errors": [],
+  "passed": true
+}

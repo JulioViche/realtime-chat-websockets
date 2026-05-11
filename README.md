@@ -21,7 +21,7 @@ El proyecto une una API REST con un servidor WebSocket, persistencia en MongoDB,
 |---|---|
 | Frontend | React 19, Vite 6, Tailwind CSS 4, React Router, Axios, Socket.io Client |
 | Backend | Node.js, Express 5, Socket.io 4, Mongoose 9, Multer |
-| Seguridad | JWT admin, bcrypt para PIN, HMAC con `PIN_PEPPER` |
+| Seguridad | Admin en MongoDB con bcrypt, JWT revocable, PIN con bcrypt, HMAC y modo opcional AES-GCM |
 | Concurrencia | Piscina + Worker Threads |
 | Base de datos | MongoDB |
 | Pruebas | Jest, Supertest, socket.io-client |
@@ -73,6 +73,8 @@ El proyecto une una API REST con un servidor WebSocket, persistencia en MongoDB,
 - [Workers y Concurrencia](#workers-y-concurrencia)
 - [Frontend y UX](#frontend-y-ux)
 - [Pruebas](#pruebas)
+- [Auditoria y Rendimiento](#auditoria-y-rendimiento)
+- [Docker](#docker)
 - [Acceso desde Celular](#acceso-desde-celular)
 - [Troubleshooting](#troubleshooting)
 - [Documentacion Complementaria](#documentacion-complementaria)
@@ -320,10 +322,11 @@ La API REST usa rutas relativas `/api` y Vite las redirige al backend mediante e
 4. Crea una sala con:
    - Nombre.
    - PIN numerico de minimo 4 digitos.
+   - Tratamiento del PIN: visible en panel o maxima seguridad.
    - Tipo `TEXT` o `MULTIMEDIA`.
 5. Comparte el PIN con los usuarios.
 
-Por seguridad, el panel no vuelve a mostrar el PIN en texto plano despues de crear la sala.
+Si se elige **Visible en panel**, el backend guarda el hash bcrypt para validar acceso y una copia cifrada AES-GCM para mostrar el PIN al admin. Si se elige **Maxima seguridad**, solo guarda bcrypt y `pinFingerprint`; el PIN no se puede recuperar ni mostrar despues.
 
 ### Usuario
 
@@ -342,6 +345,7 @@ node seed.js
 ```
 
 El seed limpia datos anteriores y crea salas/mensajes de ejemplo. Requiere `backend/.env` configurado.
+Tambien crea el administrador de prueba con `ADMIN_USER` y `ADMIN_PASS`, guardando la contrasena hasheada en MongoDB.
 
 ---
 
@@ -357,8 +361,10 @@ http://localhost:3000
 |---|---|---|---|
 | `GET` | `/` | No | Health check de la API. |
 | `POST` | `/api/auth/login` | No | Login admin y emision de JWT. |
+| `POST` | `/api/auth/logout` | JWT | Cierra sesion e invalida el token actual. |
 | `POST` | `/api/rooms` | JWT | Crea sala. |
-| `GET` | `/api/rooms` | JWT | Lista salas sin exponer PIN. |
+| `GET` | `/api/rooms` | JWT | Lista salas y muestra el PIN solo si la sala usa modo recuperable. |
+| `DELETE` | `/api/rooms/bulk` | JWT | Elimina varias salas seleccionadas o todas. |
 | `DELETE` | `/api/rooms/:id` | JWT | Elimina sala y mensajes asociados. |
 | `GET` | `/api/rooms/:pin/messages` | No | Obtiene historial y tipo de sala. |
 | `POST` | `/api/upload` | No | Sube archivo permitido. |
@@ -398,9 +404,15 @@ Content-Type: application/json
 {
   "name": "Sala de soporte",
   "pin": "1234",
+  "pinSecurityMode": "RECOVERABLE",
   "type": "MULTIMEDIA"
 }
 ```
+
+`pinSecurityMode` acepta:
+
+- `RECOVERABLE`: valida con bcrypt y guarda una copia cifrada AES-GCM para mostrar el PIN en el panel admin.
+- `NON_RECOVERABLE`: valida con bcrypt y no guarda copia reversible; el PIN no se podra recuperar.
 
 Respuesta:
 
@@ -410,6 +422,9 @@ Respuesta:
   "room": {
     "_id": "...",
     "name": "Sala de soporte",
+    "pin": "1234",
+    "pinSecurityMode": "RECOVERABLE",
+    "pinCanBeRecovered": true,
     "type": "MULTIMEDIA",
     "isActive": true
   }
@@ -484,6 +499,8 @@ erDiagram
     string name
     string pin
     string pinFingerprint
+    string pinEncrypted
+    string pinSecurityMode
     string type
     boolean isActive
     date createdAt
@@ -527,15 +544,17 @@ erDiagram
 
 | Capa | Implementacion |
 |---|---|
-| Admin | JWT firmado con `JWT_SECRET`. |
-| PIN | bcrypt para almacenar hash seguro. |
+| Admin | Usuario en MongoDB con contrasena bcrypt; JWT firmado con `JWT_SECRET`. |
+| PIN | bcrypt para validar acceso; AES-GCM opcional solo si la sala usa modo recuperable. |
 | Duplicados | HMAC SHA-256 con `PIN_PEPPER` mediante `pinFingerprint`. |
 | Middleware | `authMiddleware.js` valida rutas admin. |
 | Sesiones | `usuariosConectados` controla socket, usuario, sala e IP. |
 | Inactividad | Timeout de 30 minutos por socket. |
 | Archivos | Filtro MIME y limite de 10 MB. |
+| Logout | `POST /api/auth/logout` revoca el JWT en memoria hasta su expiracion. |
+| Headers | CORS, `X-Content-Type-Options`, `X-Frame-Options` y `Referrer-Policy`. |
 
-El PIN no se desencripta. Se compara el PIN ingresado contra el hash guardado usando bcrypt.
+El PIN de acceso siempre se compara contra el hash guardado usando bcrypt. `pinFingerprint` sirve para detectar PINs duplicados sin guardar el PIN en plano. En modo `RECOVERABLE`, el backend ademas descifra `pinEncrypted` para mostrar el PIN en el panel admin; en modo `NON_RECOVERABLE`, `pinEncrypted` no se guarda y el PIN no se puede recuperar.
 
 ---
 
@@ -619,11 +638,18 @@ npm run test:watch
 Suites incluidas:
 
 - Autenticacion.
+- Modelo Admin y contrasenas bcrypt.
 - Middleware JWT.
 - CRUD de salas.
 - WebSockets.
 - Upload de archivos.
 - Workers.
+
+Reporte HTML:
+
+```text
+backend/coverage/lcov-report/index.html
+```
 
 ### Frontend
 
@@ -632,6 +658,84 @@ cd frontend
 npm run lint
 npm run build
 ```
+
+---
+
+## Auditoria y Rendimiento
+
+### Prueba de carga con 50 usuarios
+
+Con el backend activo:
+
+```bash
+cd backend
+npm run load:test
+```
+
+El script crea una sala temporal, conecta 50 clientes Socket.io con `deviceId` distinto, envia mensajes y genera reportes en:
+
+```text
+docs/audit/load-test-50-users.md
+docs/audit/load-test-50-users.json
+```
+
+En Windows, si `localhost` resuelve por IPv6 y el backend esta en IPv4, usa:
+
+```powershell
+$env:LOAD_TEST_API_URL="http://127.0.0.1:3000"
+cd backend
+npm run load:test
+```
+
+### Prueba de ambiente local
+
+Desde la raiz del repositorio, con el backend activo:
+
+```bash
+node scripts/environmentCheck.js
+```
+
+Genera:
+
+```text
+docs/audit/environment-smoke.md
+```
+
+El reporte valida Node, npm, estructura backend/frontend, `.env.example`, `.env` ignorados por Git, dependencias, build frontend, cobertura y health check.
+
+### Evidencia de auditoria
+
+La hoja de control para entrega esta en:
+
+```text
+docs/audit/auditoria-entrega.md
+```
+
+Los diagramas de secuencia obligatorios estan en:
+
+```text
+docs/sequence-diagrams.md
+```
+
+---
+
+## Docker
+
+Levantar todo el sistema con MongoDB, backend y frontend:
+
+```bash
+docker compose up --build
+```
+
+Servicios:
+
+```text
+Frontend: http://localhost:5173
+Backend:  http://localhost:3000
+MongoDB:  localhost:27017
+```
+
+Los datos de MongoDB y los archivos subidos persisten en volumenes Docker.
 
 ---
 
@@ -734,6 +838,7 @@ cd backend
 npm install
 node main.js
 npm test
+npm run load:test
 
 # Frontend
 cd frontend
@@ -745,6 +850,13 @@ npm run lint
 # Seed
 cd backend
 node seed.js
+
+# Auditoria local
+cd ..
+node scripts/environmentCheck.js
+
+# Docker
+docker compose up --build
 ```
 
 ---
@@ -753,6 +865,10 @@ node seed.js
 
 - [Requisitos del proyecto](./docs/requisitos.md)
 - [Modelo de datos](./docs/datamodel/datamodel.md)
+- [Diagramas de secuencia](./docs/sequence-diagrams.md)
+- [Evidencia de auditoria](./docs/audit/auditoria-entrega.md)
+- [Prueba de carga 50 usuarios](./docs/audit/load-test-50-users.md)
+- [Prueba de ambiente local](./docs/audit/environment-smoke.md)
 - [Contenedores Docker](./docs/containers.md)
 - [Presentacion del enunciado](./docs/proyecto_p1.pdf)
 

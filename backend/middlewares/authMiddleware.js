@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken')
+const { isTokenRevoked } = require('../utils/tokenBlocklist')
 
 const verifyAdminToken = (req, res, next) => {
   const authHeader = req.headers.authorization
@@ -10,6 +11,10 @@ const verifyAdminToken = (req, res, next) => {
   const token = authHeader.split(' ')[1]
 
   try {
+    if (isTokenRevoked(token)) {
+      return res.status(401).json({ error: 'Token inválido o expirado' })
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
     if (decoded.role !== 'admin') {
@@ -19,6 +24,7 @@ const verifyAdminToken = (req, res, next) => {
     }
 
     req.admin = decoded
+    req.token = token
     next() // Pasa al siguiente middleware o controlador (ej: crear sala)
   } catch (error) {
     return res.status(401).json({ error: 'Token inválido o expirado' })

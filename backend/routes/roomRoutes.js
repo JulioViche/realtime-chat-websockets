@@ -6,6 +6,7 @@ const { verifyAdminToken } = require('../middlewares/authMiddleware')
 // Rutas Administrativas (Protegidas)
 router.post('/', verifyAdminToken, roomController.createRoom)
 router.get('/', verifyAdminToken, roomController.getAllRooms)
+router.delete('/bulk', verifyAdminToken, roomController.deleteRooms)
 router.delete('/:id', verifyAdminToken, roomController.deleteRoom)
 
 // Rutas Públicas (Para usuarios)

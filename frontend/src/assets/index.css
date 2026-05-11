@@ -626,6 +626,13 @@ img {
     transform: translateY(0);
   }
 
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+    transform: none;
+    box-shadow: none;
+  }
+
   .btn-primary {
     color: #ffffff;
     background: linear-gradient(135deg, var(--color-primary), #12a48f);
@@ -738,6 +745,56 @@ img {
     margin-bottom: 22px;
   }
 
+  .dashboard-actions {
+    display: flex;
+    min-width: min(100%, 560px);
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-actions .btn {
+    width: auto;
+    min-width: 138px;
+  }
+
+  .selection-toggle {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 15px;
+    color: var(--color-heading);
+    background: var(--color-surface);
+    font-size: 0.9rem;
+    font-weight: 900;
+    transition:
+      border-color 180ms ease,
+      background 180ms ease,
+      transform 180ms ease;
+  }
+
+  .selection-toggle:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(
+      in srgb,
+      var(--color-primary) 35%,
+      var(--color-border)
+    );
+    background: var(--color-surface-muted);
+  }
+
+  .selection-toggle input,
+  .room-select input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+  }
+
   .dashboard-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -789,6 +846,15 @@ img {
       border-color 180ms ease;
   }
 
+  .room-card-selected {
+    border-color: color-mix(
+      in srgb,
+      var(--color-primary) 55%,
+      var(--color-border)
+    );
+    box-shadow: var(--shadow-panel);
+  }
+
   .room-card:hover {
     transform: translateY(-2px);
     border-color: color-mix(
@@ -797,6 +863,22 @@ img {
       var(--color-border)
     );
     box-shadow: var(--shadow-panel);
+  }
+
+  .room-card-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .room-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 900;
   }
 
   .badge {
@@ -818,6 +900,21 @@ img {
   .badge-accent {
     color: var(--color-accent-strong);
     background: var(--color-accent-soft);
+  }
+
+  .badge-recoverable {
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
+  }
+
+  .badge-secure {
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  }
+
+  .badge-muted {
+    color: var(--color-muted);
+    background: var(--color-surface-muted);
   }
 
   .empty-state {
@@ -1190,6 +1287,41 @@ img {
     color: var(--color-text);
     background: var(--color-surface);
   }
+
+  .swal-security-options {
+    display: grid;
+    gap: 10px;
+  }
+
+  .security-option {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    margin: 0 !important;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+  }
+
+  .security-option input {
+    width: 16px !important;
+    min-height: 16px !important;
+    margin-top: 3px;
+    accent-color: var(--color-primary);
+  }
+
+  .security-option strong,
+  .security-option small {
+    display: block;
+  }
+
+  .security-option small {
+    margin-top: 4px;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
 }
 
 @layer utilities {
@@ -1301,6 +1433,12 @@ img {
   .nav-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .dashboard-actions,
+  .dashboard-actions .btn,
+  .selection-toggle {
+    width: 100%;
   }
 
   .feature-row,

@@ -1,0 +1,10 @@
+**/node_modules
+**/coverage
+**/dist
+**/.env
+**/.env.local
+backend/uploads/*
+!backend/uploads/.gitkeep
+.git
+.gitignore
+npm-debug.log*

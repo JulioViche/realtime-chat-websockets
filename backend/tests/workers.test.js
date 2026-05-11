@@ -18,6 +18,24 @@ describe('Worker Logic Unit Tests (Piscina Compatible)', () => {
       expect(result.isDuplicateName).toBe(false);
     });
 
+    test('action: validateJoin - should allow different devices behind the same IP', async () => {
+      const payload = {
+        usuarios: [[
+          'old-socket',
+          { user: 'OldUser', roomId: 'room1', ip: '1.2.3.4', deviceId: 'device-a' }
+        ]],
+        socketId: 'new-socket',
+        userIp: '1.2.3.4',
+        deviceId: 'device-b',
+        roomId: 'room1',
+        user: 'NewUser'
+      };
+
+      const result = await socketWorker({ action: 'validateJoin', payload });
+      expect(result.existingSession).toBeNull();
+      expect(result.isDuplicateName).toBe(false);
+    });
+
     test('action: validateJoin - should return duplicate name if name matches in same room', async () => {
       const payload = {
         usuarios: [['other-socket', { user: 'TestUser', roomId: 'room1', ip: '5.6.7.8' }]],
@@ -46,6 +64,29 @@ describe('Worker Logic Unit Tests (Piscina Compatible)', () => {
       expect(result).toContain('User1');
       expect(result).toContain('User3');
       expect(result).not.toContain('User2');
+    });
+
+    test('action: processMessage - should add sender and worker marker', async () => {
+      const result = await socketWorker({
+        action: 'processMessage',
+        payload: {
+          messageData: { roomId: 'roomA', content: 'Hola' },
+          user: 'TestUser'
+        }
+      });
+
+      expect(result).toMatchObject({
+        roomId: 'roomA',
+        content: 'Hola',
+        user: 'TestUser',
+        isWorkerProcessed: true
+      });
+    });
+
+    test('unknown action - should return null', async () => {
+      const result = await socketWorker({ action: 'unknown', payload: {} });
+
+      expect(result).toBeNull();
     });
   });
 

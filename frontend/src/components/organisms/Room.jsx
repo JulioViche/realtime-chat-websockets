@@ -20,6 +20,20 @@ const getSocketUrl = () => {
 }
 
 const SOCKET_URL = getSocketUrl()
+const DEVICE_ID_KEY = 'chatDeviceId'
+
+const getDeviceId = () => {
+  if (typeof window === 'undefined') return 'server-render-device'
+
+  const savedDeviceId = localStorage.getItem(DEVICE_ID_KEY)
+  if (savedDeviceId) return savedDeviceId
+
+  const newDeviceId =
+    window.crypto?.randomUUID?.() ||
+    `device-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  localStorage.setItem(DEVICE_ID_KEY, newDeviceId)
+  return newDeviceId
+}
 
 const Room = () => {
   const { pin } = useParams()
@@ -58,7 +72,11 @@ const Room = () => {
       return undefined
     }
 
-    socketRef.current = io(SOCKET_URL)
+    socketRef.current = io(SOCKET_URL, {
+      auth: {
+        deviceId: getDeviceId(),
+      },
+    })
 
     const attemptJoin = (usernameToUse, force = false) => {
       socketRef.current.emit(

@@ -1,6 +1,11 @@
 const bcrypt = require('bcrypt')
+const crypto = require('crypto')
 
 module.exports = async ({ action, payload }) => {
+  if (action === 'generatePin') {
+    return crypto.randomInt(0, 1000000).toString().padStart(6, '0')
+  }
+
   if (action === 'verifyRoomPin') {
     const { pin, rooms } = payload
     

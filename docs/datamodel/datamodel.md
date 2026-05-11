@@ -18,6 +18,9 @@ Modelado de datos para el sistema de mensajería, para el que se siguen las sigu
 - `_id`: identificador único de la sala (PK, generado automáticamente)
 - `name`: nombre de la sala (string)
 - `pin`: PIN de acceso a la sala (string, generado automáticamente)
+- `pinFingerprint`: huella HMAC del PIN para detectar duplicados sin guardar el PIN en plano
+- `pinEncrypted`: copia cifrada del PIN para mostrarlo en el panel administrador cuando la sala usa modo recuperable
+- `pinSecurityMode`: modo de tratamiento del PIN (`RECOVERABLE` o `NON_RECOVERABLE`)
 - `type`: tipo de sala, puede ser 'TEXT' o 'MULTIMEDIA' (enum)
 - `isActive`: indica si la sala está activa (boolean)
 - `createdAt`: fecha y hora de creación de la sala (datetime, generado automáticamente)
@@ -52,6 +55,9 @@ direction LR
 		ObjectId _id PK
 		string name
 		string pin
+		string pinFingerprint
+		string pinEncrypted
+		string pinSecurityMode
 		string type
 		bool isActive
 		datetime createdAt

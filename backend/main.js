@@ -8,6 +8,17 @@ const Piscina = require('piscina')
 require('dotenv').config()
 
 const app = express()
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Device-Id')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  return next()
+})
 app.use(express.json())
 
 // Configurar carpeta pública para exponer los archivos subidos
@@ -19,6 +30,7 @@ const uploadRoutes = require('./routes/uploadRoutes') // Volvemos a integrar rut
 
 // Modelos necesarios para sincronizar índices
 const Room = require('./models/Room')
+const Admin = require('./models/Admin')
 
 // Ya NO incluimos las rutas de sesiones (UserSession)
 app.use('/api/auth', authRoutes)
@@ -30,6 +42,8 @@ mongoose
   .then(async () => {
     console.log('MongoDB connected')
     await Room.syncIndexes()
+    await Admin.syncIndexes()
+    await ensureDefaultAdmin()
     console.log('Índices sincronizados correctamente')
   })
   .catch((err) => console.error(err))
@@ -37,6 +51,22 @@ mongoose
 app.get('/', (req, res) => {
   res.send('API funcionando')
 })
+
+async function ensureDefaultAdmin() {
+  const username = process.env.ADMIN_USER
+  const password = process.env.ADMIN_PASS
+
+  if (!username || !password) {
+    console.warn('ADMIN_USER y ADMIN_PASS no están definidos; no se creó admin inicial.')
+    return
+  }
+
+  const existingAdmin = await Admin.findOne({ username })
+  if (existingAdmin) return
+
+  await Admin.create({ username, password })
+  console.log(`Admin inicial "${username}" creado con contraseña hasheada en MongoDB`)
+}
 
 // === CONFIGURACIÓN DE WEBSOCKETS (NUEVO ENFOQUE ULTRALIGERO) ===
 const server = http.createServer(app)
@@ -61,6 +91,27 @@ const HIGH_LOAD_THRESHOLD = 5 // Umbral para activar procesamiento en Worker
 const socketPool = new Piscina({
   filename: path.join(__dirname, 'workers/socketWorker.js')
 })
+
+function getSocketDeviceId(socket) {
+  return (
+    socket.handshake.auth?.deviceId ||
+    socket.handshake.headers['x-device-id'] ||
+    socket.handshake.address
+  )
+}
+
+function sanitizeText(value, maxLength = 2000) {
+  return String(value || '')
+    .trim()
+    .replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]))
+    .slice(0, maxLength)
+}
 
 // Función auxiliar para ejecutar tareas en el pool de hilos persistente
 async function runSocketWorker(action, payload) {
@@ -96,6 +147,12 @@ io.on('connection', (socket) => {
   // 1. Cuando el usuario intenta entrar a la sala
   socket.on('joinRoom', async ({ pin, user, force }, callback) => {
     try {
+      const cleanUser = sanitizeText(user, 40)
+      if (!cleanUser) {
+        if (callback) callback({ error: 'El nickname es obligatorio' })
+        return
+      }
+
       // A. Validar que la sala exista en BD (Ahora con PIN encriptado)
       // Como el PIN está hasheado, no podemos buscarlo directamente.
       // Buscamos todas las salas activas y comparamos el PIN.
@@ -116,7 +173,8 @@ io.on('connection', (socket) => {
       }
 
       const userIp = socket.handshake.address
-      console.log(`Intentando unir usuario: ${user} desde IP: ${userIp}, force: ${force}`)
+      const deviceId = getSocketDeviceId(socket)
+      console.log(`Intentando unir usuario: ${cleanUser} desde IP: ${userIp}, force: ${force}`)
       
       const roomIdStr = room._id.toString()
 
@@ -125,12 +183,13 @@ io.on('connection', (socket) => {
         usuarios: Array.from(usuariosConectados.entries()),
         socketId: socket.id,
         userIp,
+        deviceId,
         roomId: roomIdStr,
-        user
+        user: cleanUser
       })
 
       // Si hay conflicto de IP y NO se ha pedido forzar la entrada
-      if (existingSession && !force && existingSession.user !== user) {
+      if (existingSession && !force && existingSession.user !== cleanUser) {
         if (callback) callback({ 
           error: 'session_conflict', 
           existingUser: existingSession.user 
@@ -139,7 +198,7 @@ io.on('connection', (socket) => {
       }
 
       // Si se pide forzar (o es la misma IP pero queremos cambiar/reusar) o es reconexión
-      if (existingSession && (force || existingSession.user === user)) {
+      if (existingSession && (force || existingSession.user === cleanUser)) {
         const oldSocket = io.sockets.sockets.get(existingSession.id)
         if (oldSocket) {
           oldSocket.emit('force_disconnect', 'Se ha iniciado sesión en otra pestaña.')
@@ -153,19 +212,19 @@ io.on('connection', (socket) => {
       }
 
       // Validar nombre duplicado
-      if (isDuplicateName && (!existingSession || existingSession.user !== user)) {
+      if (isDuplicateName && (!existingSession || existingSession.user !== cleanUser)) {
         if (callback) callback({ error: 'El nombre ya está en uso en esta sala' })
         return
       }
 
       // C. Si todo está bien, lo unimos al túnel y lo guardamos en RAM
       socket.join(roomIdStr)
-      usuariosConectados.set(socket.id, { user, roomId: roomIdStr, ip: userIp })
+      usuariosConectados.set(socket.id, { user: cleanUser, roomId: roomIdStr, ip: userIp, deviceId })
       
       // Iniciar timer de inactividad
       resetInactivityTimer(socket)
 
-      console.log(`Socket ${socket.id} (${user}) se unió a la sala ${pin} (Validado en Worker)`)
+      console.log(`Socket ${socket.id} (${cleanUser}) se unió a la sala ${pin} (Validado en Worker)`)
       
       // Enviar lista actualizada de usuarios a todos en la sala
       enviarListaUsuarios(roomIdStr)
@@ -188,6 +247,15 @@ io.on('connection', (socket) => {
         return // Ignorar el mensaje si es un intruso que no pasó por joinRoom
       }
 
+      const safeData = {
+        ...data,
+        content: sanitizeText(data.content),
+      }
+
+      if (!safeData.content && !safeData.file) {
+        return
+      }
+
       // Resetear timer de inactividad al enviar mensaje
       resetInactivityTimer(socket)
 
@@ -197,11 +265,11 @@ io.on('connection', (socket) => {
       if (usuariosConectados.size > HIGH_LOAD_THRESHOLD) {
         console.log(`[Carga Alta] Procesando mensaje en Worker. Usuarios: ${usuariosConectados.size}`)
         mensajeEmitir = await runSocketWorker('processMessage', {
-          messageData: data,
+          messageData: safeData,
           user: session.user
         })
       } else {
-        mensajeEmitir = { ...data, user: session.user }
+        mensajeEmitir = { ...safeData, user: session.user }
       }
 
       // Guardar el mensaje en Mongo
@@ -215,13 +283,13 @@ io.on('connection', (socket) => {
       mensajeEmitir._id = mensajeGuardado._id
 
       // Guardar el archivo en Mongo si existe
-      if (data.file) {
+      if (safeData.file) {
         const nuevoArchivo = new File({
           messageId: mensajeGuardado._id,
-          name: data.file.name,
-          url: data.file.url,
-          type: data.file.type,
-          size: data.file.size
+          name: safeData.file.name,
+          url: safeData.file.url,
+          type: safeData.file.type,
+          size: safeData.file.size
         })
         await nuevoArchivo.save()
       }

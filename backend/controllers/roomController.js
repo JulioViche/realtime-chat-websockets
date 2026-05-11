@@ -9,9 +9,37 @@ const roomPool = new Piscina({
   filename: path.join(__dirname, '../workers/roomWorker.js')
 })
 
+const toAdminRoom = (room) => {
+  const roomData = room.toObject ? room.toObject() : room
+  const pinSecurityMode =
+    roomData.pinSecurityMode || Room.PIN_SECURITY_MODES.RECOVERABLE
+  let readablePin = null
+
+  if (pinSecurityMode === Room.PIN_SECURITY_MODES.RECOVERABLE) {
+    try {
+      readablePin = Room.decryptPin(roomData.pinEncrypted)
+    } catch {
+      readablePin = null
+    }
+  }
+
+  delete roomData.pin
+  delete roomData.pinEncrypted
+  delete roomData.pinFingerprint
+  const pinCanBeRecovered =
+    pinSecurityMode === Room.PIN_SECURITY_MODES.RECOVERABLE && Boolean(readablePin)
+
+  return {
+    ...roomData,
+    pin: readablePin,
+    pinSecurityMode,
+    pinCanBeRecovered
+  }
+}
+
 exports.createRoom = async (req, res) => {
   try {
-    const { name, type, pin } = req.body
+    const { name, type, pin, pinSecurityMode = Room.PIN_SECURITY_MODES.RECOVERABLE } = req.body
 
     if (!name) {
       return res
@@ -25,6 +53,10 @@ exports.createRoom = async (req, res) => {
         .json({ error: 'El PIN es obligatorio y debe tener al menos 4 dígitos numéricos' })
     }
 
+    if (!Object.values(Room.PIN_SECURITY_MODES).includes(pinSecurityMode)) {
+      return res.status(400).json({ error: 'Modo de seguridad del PIN inválido' })
+    }
+
     const pinFingerprint = Room.generatePinFingerprint(pin)
     const existingRoom = await Room.findOne({ pinFingerprint })
     if (existingRoom) {
@@ -35,6 +67,7 @@ exports.createRoom = async (req, res) => {
       name,
       pin,
       pinFingerprint,
+      pinSecurityMode,
       type: type || 'TEXT',
     })
 
@@ -45,6 +78,11 @@ exports.createRoom = async (req, res) => {
       room: {
         _id: savedRoom._id,
         name: savedRoom.name,
+        pin: savedRoom.pinSecurityMode === Room.PIN_SECURITY_MODES.RECOVERABLE
+          ? Room.decryptPin(savedRoom.pinEncrypted)
+          : null,
+        pinSecurityMode: savedRoom.pinSecurityMode,
+        pinCanBeRecovered: savedRoom.pinSecurityMode === Room.PIN_SECURITY_MODES.RECOVERABLE,
         type: savedRoom.type,
         isActive: savedRoom.isActive
       },
@@ -62,8 +100,11 @@ exports.createRoom = async (req, res) => {
 
 exports.getAllRooms = async (req, res) => {
   try {
-    const rooms = await Room.find().select('-pin').sort({ createdAt: -1 })
-    res.status(200).json(rooms)
+    const rooms = await Room.find()
+      .select('-pin -pinFingerprint +pinEncrypted')
+      .sort({ createdAt: -1 })
+
+    res.status(200).json(rooms.map(toAdminRoom))
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener las salas', details: error.message })
   }
@@ -87,11 +128,40 @@ exports.deleteRoom = async (req, res) => {
   }
 }
 
+exports.deleteRooms = async (req, res) => {
+  try {
+    const { ids = [], all = false } = req.body
+
+    if (!all && (!Array.isArray(ids) || ids.length === 0)) {
+      return res.status(400).json({ error: 'Selecciona al menos una sala para eliminar' })
+    }
+
+    const uniqueIds = [...new Set(ids.filter(Boolean))]
+    const filter = all ? {} : { _id: { $in: uniqueIds } }
+    const rooms = await Room.find(filter).select('_id').lean()
+    const roomIds = rooms.map((room) => room._id)
+
+    if (roomIds.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron salas para eliminar' })
+    }
+
+    await Room.deleteMany({ _id: { $in: roomIds } })
+    await Message.deleteMany({ roomId: { $in: roomIds } })
+
+    res.status(200).json({
+      message: 'Salas eliminadas exitosamente',
+      deletedCount: roomIds.length
+    })
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar las salas', details: error.message })
+  }
+}
+
 exports.getRoomMessages = async (req, res) => {
   try {
     const { pin } = req.params
 
-    // Como el PIN está encriptado, delegamos la comparación masiva al worker
+    // Como el PIN de acceso está hasheado con bcrypt, delegamos la comparación masiva al worker
     // Usamos .lean() para obtener objetos planos de JS que se serializan bien hacia el worker
     const rooms = await Room.find({ isActive: true }).select('_id pin type').lean()
 

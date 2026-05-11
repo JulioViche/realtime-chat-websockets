@@ -2,13 +2,17 @@ const { parentPort } = require('worker_threads')
 
 module.exports = ({ action, payload }) => {
   if (action === 'validateJoin') {
-    const { usuarios, socketId, userIp, roomId, user } = payload
+    const { usuarios, socketId, userIp, deviceId, roomId, user } = payload
     let existingSession = null
     let isDuplicateName = false
 
     for (const [id, val] of usuarios) {
-      // 1. Validar si ya hay una sesión de esa IP en este cuarto
-      if (val.ip === userIp && val.roomId === roomId && id !== socketId) {
+      const sameDevice = deviceId
+        ? val.deviceId === deviceId
+        : val.ip === userIp
+
+      // 1. Validar si ya hay una sesión del mismo dispositivo en este cuarto
+      if (sameDevice && val.roomId === roomId && id !== socketId) {
         existingSession = { id, user: val.user, roomId: val.roomId }
         break
       }
