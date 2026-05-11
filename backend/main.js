@@ -220,7 +220,8 @@ io.on('connection', (socket) => {
           messageId: mensajeGuardado._id,
           name: data.file.name,
           url: data.file.url,
-          type: data.file.type
+          type: data.file.type,
+          size: data.file.size
         })
         await nuevoArchivo.save()
       }

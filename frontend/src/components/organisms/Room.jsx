@@ -167,6 +167,7 @@ const Room = () => {
           name: uploadResponse.data.file.originalname,
           url: `${SOCKET_URL}${uploadResponse.data.url}`,
           type: uploadResponse.data.file.mimetype,
+          size: uploadResponse.data.file.size,
         }
       } catch (uploadError) {
         const errorMessage =
