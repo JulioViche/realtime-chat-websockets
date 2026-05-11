@@ -34,6 +34,7 @@ const Room = () => {
   const fetchHistory = useCallback(async () => {
     try {
       const response = await axios.get(`/api/rooms/${pin}/messages`)
+      setRoomType(response.data.roomType?.toUpperCase() || 'TEXT')
       setMessages(response.data.messages)
     } catch {
       setError('Error al cargar historial')
@@ -99,7 +100,7 @@ const Room = () => {
             return
           }
 
-          setRoomType(response.roomType)
+          setRoomType(response.roomType?.toUpperCase() || 'TEXT')
           setRoomId(response.roomId)
           fetchHistory()
         },
