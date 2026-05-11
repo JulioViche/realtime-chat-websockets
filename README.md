@@ -23,102 +23,79 @@ El sistema garantiza una **comunicación bidireccional instantánea** (baja late
 
 El proyecto sigue una arquitectura **Cliente-Servidor** separada en dos capas principales, comunicadas a través de una API RESTful y un túnel WebSocket persistente.
 
-*   **Frontend (Cliente):** React.js + Vite + TailwindCSS.
-*   **Backend (Servidor):** Node.js + Express.js + Socket.io.
-*   **Base de Datos:** MongoDB (Persistencia de mensajes, configuración de salas y almacenamiento de credenciales hasheadas con `bcrypt`).
+### 🎨 Frontend (UI)
+Construido con **React y Vite**, proporcionando una interfaz moderna y responsiva.
+- **Tailwind CSS:** Estilado rápido y consistente.
+- **Socket.io Client:** Conexión bidireccional persistente.
+- **Atomic Design:** Estructura modular (`atoms`, `molecules`, `organisms`).
 
-### 📊 Diagramas y Modelos
-Para un detalle exhaustivo del diseño del sistema, consulta los siguientes documentos en la carpeta `/docs`:
+### ⚙️ Backend (API)
+Núcleo del sistema construido con **Node.js**, **Express** y **Socket.io**.
+- **Worker Threads:** Delegación de tareas pesadas (`socketWorker.js`, `fileWorker.js`) para evitar bloqueos del Event Loop.
+- **Sesiones en RAM:** Gestión eficiente de usuarios conectados y timeout por inactividad (30 min).
+- **Seguridad:** Hasheo de PINs con `bcrypt` y validación estricta de archivos con `multer`.
+
+### 📊 Base de Datos
+- **MongoDB:** Almacenamiento de mensajes, configuración de salas y credenciales de administrador.
+
+Para un detalle exhaustivo, consulta la carpeta `/docs`:
 1.  📄 **[Modelo de Datos y Reglas de Negocio](./docs/datamodel/datamodel.md)**
 2.  🐳 **[Arquitectura de Contenedores (Docker)](./docs/containers.md)**
-3.  📋 **[Documento Original de Requisitos](./docs/requisitos.md)**
 
 ---
 
-## ⚙️ 3. Requisitos Previos
+## 🚀 3. Instalación y Configuración
 
-Para ejecutar este proyecto en un entorno local, necesitas tener instalado:
-*   **Node.js** (v18.0 o superior).
-*   **MongoDB** (Instalación local como servicio de Windows o mediante contenedor Docker en el puerto `27017`).
-*   **Git** (Para clonar el repositorio).
+### Paso 1: Requisitos Previos
+*   **Node.js** (v18.0+)
+*   **MongoDB** corriendo en el puerto `27017`
 
----
-
-## 🚀 4. Instalación y Despliegue Local
-
-Sigue estos pasos cuidadosamente para levantar ambos entornos (Backend y Frontend).
-
-### Paso 4.1: Configuración del Backend (Servidor)
-1. Abre una terminal y dirígete a la carpeta del backend:
-   ```bash
-   cd backend
-   ```
-2. Instala las dependencias necesarias:
-   ```bash
-   npm install
-   ```
-3. Crea un archivo `.env` en la raíz de la carpeta `backend` con la siguiente configuración:
+### Paso 2: Configuración del Backend
+1. Entra a `backend/` e instala dependencias: `npm install`.
+2. Crea un archivo `backend/.env`:
    ```env
    PORT=3000
    MONGO_URI=mongodb://localhost:27017/realtime-chat
-   JWT_SECRET=tu_clave_secreta_aqui
+   JWT_SECRET=tu_clave_secreta
    ADMIN_USER=admin
    ADMIN_PASS=admin123
-   PIN_PEPPER=clave_secreta_para_huellas
+   PIN_PEPPER=secreto_para_pins
    ```
-4. Inicia el servidor:
-   ```bash
-   node main.js
-   ```
-   *(Deberías ver los mensajes: "Servidor corriendo en puerto 3000" y "MongoDB connected").*
+3. Inicia: `node main.js`.
 
-### Paso 4.2: Configuración del Frontend (Cliente)
-1. Abre **otra** pestaña de terminal y dirígete a la carpeta del frontend:
-   ```bash
-   cd frontend
+### Paso 3: Configuración del Frontend
+1. Entra a `frontend/` e instala dependencias: `npm install`.
+2. Crea un archivo `frontend/.env`:
+   ```env
+   VITE_SOCKET_URL=http://localhost:3000
    ```
-2. Instala las dependencias:
-   ```bash
-   npm install
-   ```
-3. Levanta el servidor de desarrollo:
-   ```bash
-   npm run dev
-   ```
-4. Abre tu navegador web en la dirección indicada (usualmente `http://localhost:5173`).
+3. Inicia: `npm run dev`.
 
 ---
 
-## 📖 5. Guía de Uso
+## 📱 4. Acceso Externo (Mobile Hotspot)
 
-### Para el Administrador (Creación de Salas)
-1. Ve a `http://localhost:5173/admin` en tu navegador.
-2. Inicia sesión con las credenciales definidas en tu `.env` (Ej. Usuario: `admin`, Clave: `admin123`).
-3. En el **Panel de Control**, haz clic en **"Nueva Sala"**.
-4. Define un nombre, escribe un **PIN numérico (Mínimo 4 dígitos)**, y elige el tipo de sala (Texto o Multimedia).
-5. **¡Importante!** Comparte el PIN que acabas de escribir con los usuarios. Por seguridad criptográfica, el sistema no guardará el PIN en texto plano para mostrarlo después.
+Para conectar dispositivos externos (como un celular) usando la zona de cobertura de tu laptop:
 
-### Para el Usuario Final (Chatear)
-1. Ve a la página principal `http://localhost:5173/`.
-2. Ingresa el **PIN** que te proporcionó el administrador.
-3. Elige un **Nickname** (debe ser único en esa sala).
-4. Haz clic en "Unirse a la sala".
-5. Si la sala es **Multimedia**, verás un icono de "Clip" para adjuntar imágenes o PDFs (Límite: 10MB).
-6. Al cerrar la pestaña, tu sesión se liberará automáticamente.
+1. **IP de la Red:** Identifica tu IP de Hotspot (ej. `192.168.137.1`).
+2. **Frontend .env:** Cambia `VITE_SOCKET_URL` en `frontend/.env` a la IP de tu laptop:
+   ```env
+   VITE_SOCKET_URL=http://192.168.137.1:3000
+   ```
+3. **Ejecutar Frontend:** Usa el flag `--host` para que sea visible en la red:
+   ```bash
+   npm run dev -- --host
+   ```
+4. **Acceso:** En el celular, entra a `http://192.168.137.1:5173`.
 
 ---
 
-## 🧪 6. Pruebas Unitarias (Testing)
-El backend cuenta con una suite de pruebas automatizadas (Jest) que verifican la lógica de negocio, concurrencia de WebSockets y manejo de errores.
-
-Para ejecutarlas:
+## 🧪 5. Pruebas (Testing)
+El backend incluye pruebas automatizadas con **Jest**:
 ```bash
 cd backend
-npm test
-```
-Para ver el porcentaje de cobertura de código (Coverage > 70%):
-```bash
-npm test -- --coverage
+npm test                # Ejecutar tests
+npm test -- --coverage  # Ver cobertura de código
 ```
 
 ---

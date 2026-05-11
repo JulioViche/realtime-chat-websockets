@@ -271,7 +271,7 @@ async function enviarListaUsuarios(roomId) {
 const PORT = process.env.PORT || 3000
 // ATENCIÓN: Ahora levantamos 'server', no 'app'
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`Servidor (con Sockets) corriendo en puerto ${PORT}`))
+  server.listen(PORT, '0.0.0.0', () => console.log(`Servidor (con Sockets) corriendo en puerto ${PORT} y accesible en toda la red`))
 }
 
 module.exports = { app, server, io, usuariosConectados, inactivityTimers }
