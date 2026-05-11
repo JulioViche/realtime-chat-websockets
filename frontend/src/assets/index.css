@@ -876,6 +876,18 @@ img {
     padding-block: 14px;
   }
 
+  .chat-title-block {
+    min-width: 0;
+  }
+
+  .chat-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+
   .pin-pill {
     display: inline-flex;
     align-items: center;
@@ -934,6 +946,13 @@ img {
     min-height: 0;
     overflow-y: auto;
     padding: clamp(16px, 4vw, 28px) 12px;
+    background:
+      linear-gradient(
+        180deg,
+        transparent,
+        color-mix(in srgb, var(--color-primary-soft) 24%, transparent)
+      ),
+      transparent;
   }
 
   .message-stack {
@@ -1014,9 +1033,12 @@ img {
 
   .composer-form {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
+  }
+
+  .composer-form--with-files {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .composer-form--text-only {
@@ -1271,8 +1293,7 @@ img {
 
   .top-nav,
   .header-inner,
-  .dashboard-toolbar,
-  .chat-header-inner {
+  .dashboard-toolbar {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1346,11 +1367,93 @@ img {
     max-width: 92%;
   }
 
-  .composer-form {
+  .chat-shell {
+    height: 100svh;
+  }
+
+  .chat-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: min(100% - 22px, 1040px);
+    padding-block: 10px;
+  }
+
+  .chat-header .header-title {
+    overflow: hidden;
+    font-size: 1.35rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-actions {
+    gap: 8px;
+  }
+
+  .chat-actions .theme-toggle,
+  .chat-actions .btn {
+    min-height: 42px;
+  }
+
+  .chat-actions .theme-toggle {
+    width: 42px;
+    height: 42px;
+  }
+
+  .chat-actions .btn-ghost {
+    width: auto;
+    padding-inline: 12px;
+  }
+
+  .pin-pill {
+    max-width: 100%;
+    gap: 7px;
+    padding: 5px 9px;
+    font-size: 0.78rem;
+  }
+
+  .online-strip-inner {
+    width: min(100% - 22px, 1040px);
+    padding-block: 8px;
+  }
+
+  .message-scroller {
+    padding: 16px 12px;
+  }
+
+  .composer-inner {
+    width: min(100% - 22px, 1040px);
+    padding-block: 12px;
+  }
+
+  .composer-form--with-files {
     grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .composer-form--text-only {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .composer-form .input-field {
+    min-height: 50px;
+  }
+
+  .composer-form--text-only .input-field {
+    border-radius: 16px;
+  }
+
+  .icon-button {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
   }
 
   .btn-ghost {
     width: 100%;
+  }
+
+  .chat-actions .btn-ghost {
+    width: auto;
   }
 }

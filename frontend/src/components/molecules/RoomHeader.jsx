@@ -11,7 +11,7 @@ const RoomHeader = ({ roomName, pin, onlineCount, onLeave }) => {
   return (
     <header className="chat-header">
       <div className="chat-header-inner">
-        <div>
+        <div className="chat-title-block">
           <h1 className="header-title">{roomName}</h1>
           <div className="pin-pill">
             <FontAwesomeIcon icon={faHashtag} />
@@ -25,7 +25,7 @@ const RoomHeader = ({ roomName, pin, onlineCount, onLeave }) => {
           </div>
         </div>
 
-        <div className="nav-actions">
+        <div className="chat-actions">
           <ThemeToggle />
           <Button
             text="Salir"

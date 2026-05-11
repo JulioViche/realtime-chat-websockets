@@ -85,7 +85,11 @@ const MessageForm = ({ onSendMessage, allowFiles = false }) => {
 
         <form
           onSubmit={handleSendMessage}
-          className={`composer-form ${allowFiles ? '' : 'composer-form--text-only'}`}
+          className={`composer-form ${
+            allowFiles
+              ? 'composer-form--with-files'
+              : 'composer-form--text-only'
+          }`}
         >
           {allowFiles && (
             <div>
