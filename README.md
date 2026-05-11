@@ -4,9 +4,15 @@ Sistema web de chat en tiempo real con salas seguras por PIN, panel de administr
 
 El proyecto esta separado en backend y frontend. El backend expone una API REST, un servidor Socket.io y pools de workers para tareas pesadas. El frontend ofrece una experiencia responsive tipo landing/app, modo claro/oscuro persistente y vistas optimizadas para escritorio y movil.
 
+## Capturas
+
+![Vista de inicio](images/inicio.png)
+![Sala de chat](images/chat.png)
+
 ## Tabla de Contenido
 
 - [Caracteristicas](#caracteristicas)
+- [Capturas](#capturas)
 - [Stack](#stack)
 - [Arquitectura](#arquitectura)
 - [Estructura del Proyecto](#estructura-del-proyecto)
