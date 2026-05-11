@@ -1,11 +1,31 @@
-const Button = ({ text, onClick, type = 'button', customClass = 'mt-4' }) => {
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+
+const VARIANT_CLASS = {
+  primary: 'btn-primary',
+  secondary: 'btn-secondary',
+  danger: 'btn-danger',
+  ghost: 'btn-ghost',
+}
+
+const Button = ({
+  text,
+  children,
+  icon,
+  onClick,
+  type = 'button',
+  variant = 'primary',
+  customClass = 'mt-4',
+  ...props
+}) => {
   return (
     <button
       type={type}
-      className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg active:transform active:scale-95 ${customClass}`}
+      className={`btn ${VARIANT_CLASS[variant] || VARIANT_CLASS.primary} ${customClass}`}
       onClick={onClick}
+      {...props}
     >
-      {text}
+      {icon && <FontAwesomeIcon icon={icon} />}
+      <span>{children || text}</span>
     </button>
   )
 }

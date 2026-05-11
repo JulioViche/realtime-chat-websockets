@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import FormField from '../molecules/FormField'
 import Button from '../atoms/Button'
 import Link from '../atoms/Link'
@@ -6,50 +8,59 @@ import Error from '../atoms/Error'
 import FormTemplate from '../templates/FormTemplate'
 
 const JoinRoom = () => {
+  const navigate = useNavigate()
   const [nickname, setNickname] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState(null)
 
-  const handleJoin = async () => {
+  const handleJoin = (event) => {
+    event.preventDefault()
     setError(null)
 
-    // Validaciones básicas
-    if (!nickname || !pin) {
+    const cleanNickname = nickname.trim()
+    const cleanPin = pin.trim().toUpperCase()
+
+    if (!cleanNickname || !cleanPin) {
       setError('Por favor, completa ambos campos.')
       return
     }
 
-    // Guardar el nombre temporalmente
-    localStorage.setItem('userNickname', nickname)
-
-    // Redirigir directamente a la sala, la validación se hará por Socket allá
-    window.location.href = `/room/${pin.toUpperCase()}`
+    localStorage.setItem('userNickname', cleanNickname)
+    navigate(`/room/${cleanPin}`)
   }
 
   return (
     <FormTemplate
-      title="Unirse a Sala"
-      subtitle="Ingresa tu nickname y el PIN de la sala"
+      title="Únete a tu sala"
+      subtitle="Entra con tu nickname y el PIN privado para comenzar la conversación."
+      kicker="Chat de invitados"
     >
-      {error && <Error message={error} />}
-      <FormField
-        label="Nickname"
-        type="text"
-        placeholder="Ej: NinjaGamer"
-        value={nickname}
-        onChange={(e) => setNickname(e.target.value)}
-      />
-      <FormField
-        label="PIN de la Sala"
-        type="text"
-        placeholder="Ej: 123456"
-        value={pin}
-        onChange={(e) => setPin(e.target.value)}
-      />
-      <Button text="Entrar al Chat" onClick={handleJoin} />
+      <form onSubmit={handleJoin}>
+        {error && <Error message={error} />}
+        <FormField
+          label="Nickname"
+          type="text"
+          name="nickname"
+          placeholder="Ej: NinjaGamer"
+          value={nickname}
+          autoComplete="nickname"
+          onChange={(e) => setNickname(e.target.value)}
+        />
+        <FormField
+          label="PIN de la sala"
+          type="text"
+          name="pin"
+          placeholder="Ej: 123456"
+          value={pin}
+          autoCapitalize="characters"
+          onChange={(e) => setPin(e.target.value)}
+        />
+        <Button type="submit" text="Entrar al chat" icon={faArrowRight} />
+      </form>
+
       <Link
-        message="¿Eres administrador?"
-        text="Inicia sesión aquí"
+        message="¿Gestionas las salas?"
+        text="Entrar al panel"
         href="/admin"
       />
     </FormTemplate>

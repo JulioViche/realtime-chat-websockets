@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { faLockOpen } from '@fortawesome/free-solid-svg-icons'
 import FormField from '../molecules/FormField'
 import Button from '../atoms/Button'
 import Link from '../atoms/Link'
@@ -6,13 +8,16 @@ import Error from '../atoms/Error'
 import FormTemplate from '../templates/FormTemplate'
 
 const Login = () => {
+  const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
 
-  const handleLogin = async () => {
+  const handleLogin = async (event) => {
+    event.preventDefault()
     setError(null)
-    if (!username || !password) {
+
+    if (!username.trim() || !password.trim()) {
       setError('Por favor llena todos los campos')
       return
     }
@@ -30,36 +35,44 @@ const Login = () => {
         return
       }
 
-      // Autenticación exitosa: guardamos token y redirigimos
       localStorage.setItem('adminToken', data.token)
-      window.location.href = '/admin/dashboard'
-    } catch (err) {
+      navigate('/admin/dashboard')
+    } catch {
       setError('Error al conectar con el servidor')
     }
   }
 
   return (
     <FormTemplate
-      title="Bienvenido Administrador"
-      subtitle="Ingresa tus credenciales para iniciar sesión"
+      title="Panel administrador"
+      subtitle="Administra salas, tipos de acceso y sesiones activas desde un solo lugar."
+      kicker="Control de salas"
+      variant="admin"
     >
-      {error && <Error message={error} />}
+      <form onSubmit={handleLogin}>
+        {error && <Error message={error} />}
 
-      <FormField
-        label="Usuario"
-        type="text"
-        placeholder="Ingresa tu usuario"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <FormField
-        label="Contraseña"
-        type="password"
-        placeholder="Ingresa tu contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <Button text="Iniciar Sesión" onClick={handleLogin} />
+        <FormField
+          label="Usuario"
+          type="text"
+          name="username"
+          placeholder="Ingresa tu usuario"
+          value={username}
+          autoComplete="username"
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <FormField
+          label="Contraseña"
+          type="password"
+          name="password"
+          placeholder="Ingresa tu contraseña"
+          value={password}
+          autoComplete="current-password"
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Button type="submit" text="Iniciar sesión" icon={faLockOpen} />
+      </form>
+
       <Link message="¿Eres un usuario?" text="Únete a una sala" href="/" />
     </FormTemplate>
   )

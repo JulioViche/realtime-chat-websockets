@@ -17,6 +17,9 @@ const authRoutes = require('./routes/authRoutes')
 const roomRoutes = require('./routes/roomRoutes')
 const uploadRoutes = require('./routes/uploadRoutes') // Volvemos a integrar rutas de subida
 
+// Modelos necesarios para sincronizar índices
+const Room = require('./models/Room')
+
 // Ya NO incluimos las rutas de sesiones (UserSession)
 app.use('/api/auth', authRoutes)
 app.use('/api/rooms', roomRoutes)
@@ -24,7 +27,11 @@ app.use('/api/upload', uploadRoutes)
 
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
+  .then(async () => {
+    console.log('MongoDB connected')
+    await Room.syncIndexes()
+    console.log('Índices sincronizados correctamente')
+  })
   .catch((err) => console.error(err))
 
 app.get('/', (req, res) => {
@@ -40,7 +47,6 @@ const io = new Server(server, {
   }
 })
 
-const Room = require('./models/Room')
 const Message = require('./models/Message')
 const File = require('./models/File') // Por si hay mensajes con archivos
 

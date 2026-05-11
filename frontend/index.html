@@ -1,10 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <meta
+      name="description"
+      content="Realtime Chat, salas privadas con PIN y mensajería en vivo."
+    />
+    <title>Realtime Chat</title>
+    <script>
+      ;(() => {
+        const storageKey = 'realtime-chat-theme'
+        const savedTheme = localStorage.getItem(storageKey)
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+          .matches
+          ? 'dark'
+          : 'light'
+        const theme = savedTheme || systemTheme
+
+        document.documentElement.dataset.theme = theme
+        document.documentElement.style.colorScheme = theme
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,34 +1,42 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faFileLines } from '@fortawesome/free-regular-svg-icons'
+
+const imageExtensionPattern = /\.(jpeg|jpg|gif|png)$/i
+
+const isImageFile = (file) => {
+  return (
+    file?.type?.startsWith('image/') ||
+    imageExtensionPattern.test(file?.name || '') ||
+    imageExtensionPattern.test(file?.url || '')
+  )
+}
+
 const FilePreview = ({ file, isMine }) => {
-  // Función sencilla para deducir si es una imagen
-  const isImage =
-    file &&
-    (file.type?.startsWith('image/') ||
-      (typeof file.name === 'string' &&
-        file.name.match(/\.(jpeg|jpg|gif|png)$/i)) ||
-      (typeof file.url === 'string' &&
-        file.url.match(/\.(jpeg|jpg|gif|png)$/i)))
+  const fileUrl = file.url || '#'
+
+  if (isImageFile(file)) {
+    return (
+      <img
+        src={fileUrl}
+        alt={file.name || 'Archivo adjunto'}
+        className="attachment-image mb-2"
+      />
+    )
+  }
 
   return (
-    <div
-      className={`mb-2 rounded-lg overflow-hidden ${isMine ? 'bg-blue-700' : 'bg-gray-100'} p-1`}
-    >
-      {isImage ? (
-        <img
-          src={file.url || URL.createObjectURL(file)}
-          alt="adjunto"
-          className="max-h-48 max-w-full object-cover rounded-md"
-        />
-      ) : (
-        <div className="flex items-center p-2">
-          <FontAwesomeIcon icon={faFileLines} className="mr-2" />
-          <a
-            href={file.url || '#'}
-            className={`text-sm font-medium underline truncate ${isMine ? 'text-blue-100' : 'text-blue-600'}`}
-          >
-            {file.name}
-          </a>
-        </div>
-      )}
+    <div className="file-card">
+      <FontAwesomeIcon icon={faFileLines} />
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={`truncate text-sm font-black underline underline-offset-4 ${
+          isMine ? 'text-white' : 'text-[var(--color-primary-strong)]'
+        }`}
+      >
+        {file.name || 'Archivo adjunto'}
+      </a>
     </div>
   )
 }

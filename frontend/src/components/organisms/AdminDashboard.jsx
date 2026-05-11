@@ -1,195 +1,301 @@
-import { useState, useEffect } from 'react'
-import axios from 'axios'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Swal from 'sweetalert2'
+import {
+  faComments,
+  faDoorOpen,
+  faLayerGroup,
+  faPlus,
+  faTrash,
+} from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import Button from '../atoms/Button'
+import ThemeToggle from '../atoms/ThemeToggle'
+
+const getRoomTypeMeta = (type) => {
+  if (type === 'MULTIMEDIA') {
+    return {
+      label: 'Multimedia',
+      badgeClass: 'badge-accent',
+    }
+  }
+
+  return {
+    label: 'Solo texto',
+    badgeClass: 'badge-primary',
+  }
+}
 
 const AdminDashboard = () => {
+  const navigate = useNavigate()
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
   const token = localStorage.getItem('adminToken')
 
-  // Protección de ruta síncrona para evitar "parpadeos"
-  useEffect(() => {
-    if (!token) {
-      window.location.href = '/admin'
-    } else {
-      fetchRooms()
-    }
-  }, [token])
+  const roomStats = useMemo(
+    () => ({
+      total: rooms.length,
+      text: rooms.filter((room) => room.type === 'TEXT').length,
+      multimedia: rooms.filter((room) => room.type === 'MULTIMEDIA').length,
+    }),
+    [rooms],
+  )
 
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     try {
       const response = await fetch('/api/rooms/', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
+
       if (!response.ok) throw new Error('Error al obtener salas')
+
       const data = await response.json()
       setRooms(data)
-    } catch (err) {
-      console.error('Error al cargar salas', err)
+    } catch {
       Swal.fire('Error', 'No se pudieron cargar las salas.', 'error')
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/admin')
+      return
+    }
+
+    fetchRooms()
+  }, [fetchRooms, navigate, token])
 
   const handleDeleteRoom = async (roomId, roomName) => {
     const result = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: `Vas a cerrar la sala "${roomName}". Se perderán los mensajes.`,
+      title: '¿Cerrar sala?',
+      text: `Vas a cerrar "${roomName}" y se eliminarán sus mensajes.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Sí, cerrar sala',
-      cancelButtonText: 'Cancelar'
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#61727a',
+      confirmButtonText: 'Sí, cerrar',
+      cancelButtonText: 'Cancelar',
     })
 
-    if (result.isConfirmed) {
-      try {
-        const response = await fetch(`/api/rooms/${roomId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (!response.ok) throw new Error('Error al eliminar')
-        
-        Swal.fire('¡Cerrada!', 'La sala ha sido eliminada.', 'success')
-        fetchRooms() // Recargar lista
-      } catch (err) {
-        Swal.fire('Error', 'No se pudo eliminar la sala.', 'error')
-      }
+    if (!result.isConfirmed) return
+
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) throw new Error('Error al eliminar')
+
+      await Swal.fire('Sala cerrada', 'La sala fue eliminada.', 'success')
+      fetchRooms()
+    } catch {
+      Swal.fire('Error', 'No se pudo eliminar la sala.', 'error')
     }
   }
 
   const handleCreateRoom = async () => {
     const { value: formValues } = await Swal.fire({
-      title: 'Crear Nueva Sala',
+      title: 'Crear nueva sala',
       html:
-        '<div class="flex flex-col gap-4 text-left">' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la sala</label>' +
-        '<input id="swal-input1" class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Sala de Soporte"></div>' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Tipo de sala</label>' +
-        '<select id="swal-input2" class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">' +
-        '<option value="TEXT">Solo Texto</option>' +
-        '<option value="MULTIMEDIA">Multimedia (Archivos)</option>' +
+        '<div class="swal-form">' +
+        '<div><label for="swal-input1">Nombre de la sala</label>' +
+        '<input id="swal-input1" placeholder="Ej: Sala de soporte"></div>' +
+        '<div><label for="swal-input2">PIN de acceso (mín. 4 dígitos)</label>' +
+        '<input id="swal-input2" type="text" maxlength="10" placeholder="Ej: 1234"></div>' +
+        '<div><label for="swal-input3">Tipo de sala</label>' +
+        '<select id="swal-input3">' +
+        '<option value="TEXT">Solo texto</option>' +
+        '<option value="MULTIMEDIA">Multimedia</option>' +
         '</select></div>' +
         '</div>',
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: 'Crear Sala',
+      confirmButtonText: 'Crear sala',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#3b82f6',
+      confirmButtonColor: '#0f766e',
+      cancelButtonColor: '#61727a',
       preConfirm: () => {
-        const name = document.getElementById('swal-input1').value
-        const type = document.getElementById('swal-input2').value
+        const name = document.getElementById('swal-input1').value.trim()
+        const pin = document.getElementById('swal-input2').value.trim()
+        const type = document.getElementById('swal-input3').value
+
         if (!name) {
           Swal.showValidationMessage('El nombre es obligatorio')
           return false
         }
-        return { name, type }
-      }
+
+        if (!pin || !/^\d{4,}$/.test(pin)) {
+          Swal.showValidationMessage('El PIN debe tener al menos 4 dígitos numéricos')
+          return false
+        }
+
+        return { name, pin, type }
+      },
     })
 
-    if (formValues) {
-      try {
-        const response = await fetch('/api/rooms/', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
-          },
-          body: JSON.stringify(formValues)
-        })
-        const data = await response.json()
-        
-        if (!response.ok) throw new Error(data.error || 'Error al crear')
+    if (!formValues) return
 
-        await Swal.fire({
-          icon: 'success',
-          title: '¡Sala creada!',
-          html: `La sala se ha creado con éxito.<br><br><b>PIN de acceso:</b> <span class="text-2xl text-blue-600 font-mono">${data.room.pin}</span>`,
-          confirmButtonColor: '#3b82f6'
-        })
-        
-        fetchRooms() // Recargar lista
-      } catch (err) {
-        Swal.fire('Error', err.message || 'No se pudo crear la sala.', 'error')
-      }
+    try {
+      const response = await fetch('/api/rooms/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formValues),
+      })
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.error || 'Error al crear')
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Sala creada',
+        text: 'La sala ha sido creada exitosamente.',
+        confirmButtonColor: '#0f766e',
+      })
+
+      fetchRooms()
+    } catch (error) {
+      Swal.fire('Error', error.message || 'No se pudo crear la sala.', 'error')
     }
   }
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken')
-    window.location.href = '/admin'
+    navigate('/admin')
   }
 
   if (!token) return null
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header del Dashboard */}
-      <header className="bg-white shadow-sm px-8 py-5 flex justify-between items-center border-b border-gray-200">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Panel de Control</h1>
-          <p className="text-sm text-gray-500">Gestión de salas de chat</p>
+    <div className="dashboard-shell page-grid">
+      <header className="app-header">
+        <div className="header-inner">
+          <div className="brand-lockup">
+            <span className="brand-mark">
+              <FontAwesomeIcon icon={faLayerGroup} />
+            </span>
+            <div>
+              <h1 className="header-title">Panel de control</h1>
+              <p className="header-subtitle">Gestión de salas en tiempo real</p>
+            </div>
+          </div>
+
+          <div className="nav-actions">
+            <ThemeToggle />
+            <Button
+              text="Cerrar sesión"
+              icon={faDoorOpen}
+              variant="ghost"
+              customClass="!mt-0"
+              onClick={handleLogout}
+            />
+          </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="text-gray-500 hover:text-gray-800 font-medium text-sm transition-colors"
-        >
-          Cerrar Sesión
-        </button>
       </header>
 
-      {/* Contenido Principal */}
-      <main className="flex-1 p-8 max-w-6xl mx-auto w-full">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-700">Salas Activas ({rooms.length})</h2>
-          <div className="w-40">
-             <Button text="+ Nueva Sala" onClick={handleCreateRoom} customClass="!mt-0" />
+      <main className="dashboard-main">
+        <section className="dashboard-stats" aria-label="Resumen de salas">
+          <div className="stat-card">
+            <span>Salas activas</span>
+            <strong>{roomStats.total}</strong>
+          </div>
+          <div className="stat-card">
+            <span>Solo texto</span>
+            <strong>{roomStats.text}</strong>
+          </div>
+          <div className="stat-card">
+            <span>Multimedia</span>
+            <strong>{roomStats.multimedia}</strong>
+          </div>
+        </section>
+
+        <div className="dashboard-toolbar">
+          <div>
+            <p className="panel-kicker">Administración</p>
+            <h2 className="text-2xl font-black text-[var(--color-heading)]">
+              Salas disponibles
+            </h2>
+          </div>
+
+          <div className="w-full sm:w-48">
+            <Button
+              text="Nueva sala"
+              icon={faPlus}
+              customClass="!mt-0"
+              onClick={handleCreateRoom}
+            />
           </div>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="grid min-h-64 place-items-center">
+            <div>
+              <div className="spinner mx-auto" />
+              <p className="mt-4 text-center text-[var(--color-muted)]">
+                Cargando salas...
+              </p>
+            </div>
+          </div>
+        ) : rooms.length === 0 ? (
+          <div className="empty-state">
+            <div>
+              <FontAwesomeIcon
+                icon={faComments}
+                className="mb-4 text-3xl text-[var(--color-primary)]"
+              />
+              <p className="font-bold">No hay salas activas.</p>
+              <p className="mt-1 text-sm">Crea una sala para comenzar.</p>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rooms.map((room) => (
-              <div key={room._id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-bold text-lg text-gray-800">{room.name}</h3>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${room.type === 'MULTIMEDIA' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {room.type}
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <p>
-                    <span className="font-medium">PIN:</span>{' '}
-                    <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{room.pin}</span>
-                  </p>
-                  <p>
-                    <span className="font-medium">Estado:</span> Activa
-                  </p>
-                </div>
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button 
+          <div className="room-grid">
+            {rooms.map((room) => {
+              const typeMeta = getRoomTypeMeta(room.type)
+
+              return (
+                <article className="room-card" key={room._id}>
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-xl font-black text-[var(--color-heading)]">
+                        {room.name}
+                      </h3>
+                      <span className={`badge ${typeMeta.badgeClass}`}>
+                        {typeMeta.label}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 space-y-3 text-sm text-[var(--color-muted)]">
+                      <p>
+                        PIN:{' '}
+                        <span className="pin-code rounded-lg bg-[var(--color-surface-muted)] px-2 py-1">
+                          Privado
+                        </span>
+                      </p>
+                      <p>
+                        Estado:{' '}
+                        <span className="font-black text-[var(--color-success)]">
+                          Activa
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
                     onClick={() => handleDeleteRoom(room._id, room.name)}
-                    className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
+                    className="danger-outline-button"
                   >
-                    Cerrar Sala
+                    <FontAwesomeIcon icon={faTrash} />
+                    Cerrar sala
                   </button>
-                  <button className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">Historial</button>
-                </div>
-              </div>
-            ))}
-            
-            {rooms.length === 0 && (
-              <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-xl border border-dashed border-gray-300">
-                No hay salas activas. Crea una nueva sala para empezar.
-              </div>
-            )}
+                </article>
+              )
+            })}
           </div>
         )}
       </main>

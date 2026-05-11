@@ -1,14 +1,22 @@
 import Input from '../atoms/Input'
 
-const FormField = ({ label, type, placeholder, value, onChange }) => {
+const FormField = ({
+  label,
+  type,
+  placeholder,
+  value,
+  onChange,
+  ...inputProps
+}) => {
   return (
-    <div className="flex flex-col space-y-1 mb-4">
-      <label className="text-sm font-medium text-gray-700 ml-1">{label}</label>
+    <div className="form-field">
+      <label className="field-label">{label}</label>
       <Input
         type={type}
         placeholder={placeholder}
         value={value}
         onChange={onChange}
+        {...inputProps}
       />
     </div>
   )

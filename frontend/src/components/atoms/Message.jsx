@@ -1,5 +1,5 @@
 const Message = ({ text }) => {
-  return <p className="text-sm md:text-base wrap-break-word">{text}</p>
+  return <p className="text-sm leading-relaxed md:text-base">{text}</p>
 }
 
 export default Message

@@ -1,135 +1,131 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
+import Swal from 'sweetalert2'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faPaperclip,
+  faPaperPlane,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 import Input from '../atoms/Input'
-import Button from '../atoms/Button'
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_FILE_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'application/pdf',
+]
 
 const MessageForm = ({ onSendMessage, allowFiles = false }) => {
   const [newMessage, setNewMessage] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
 
-  const handleSendMessage = (e) => {
-    e.preventDefault()
-    if (!newMessage.trim() && !selectedFile) return
-
-    onSendMessage({ text: newMessage, file: selectedFile })
-    setNewMessage('')
+  const clearSelectedFile = () => {
     setSelectedFile(null)
-  }
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0]
-      
-      // Validar tamaño (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('El archivo es demasiado grande. El límite es 10MB.')
-        e.target.value = null
-        return
-      }
-
-      // Validar tipo
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf']
-      if (!allowedTypes.includes(file.type)) {
-        alert('Solo se permiten imágenes (JPG, PNG, GIF) y archivos PDF.')
-        e.target.value = null
-        return
-      }
-
-      setSelectedFile(file)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null
     }
   }
 
-  return (
-    <footer className="bg-white px-6 py-4 border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-      {/* Vista previa del archivo adjunto seleccionado */}
-      {selectedFile && (
-        <div className="max-w-4xl mx-auto mb-3 flex items-center bg-blue-50 p-2 rounded-lg text-sm text-blue-700 border border-blue-100">
-          <svg
-            className="w-5 h-5 mr-2 opacity-70"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-            />
-          </svg>
-          <span className="truncate flex-1 font-medium">
-            {selectedFile.name}
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedFile(null)}
-            className="ml-2 p-1 text-blue-500 hover:text-blue-800 hover:bg-blue-100 rounded-full transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-      )}
+  const handleSendMessage = (event) => {
+    event.preventDefault()
 
-      <form
-        onSubmit={handleSendMessage}
-        className="flex space-x-3 max-w-4xl mx-auto items-center"
-      >
-        {allowFiles && (
-          <div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={handleFileChange}
-            />
+    const text = newMessage.trim()
+    if (!text && !selectedFile) return
+
+    onSendMessage({ text, file: selectedFile })
+    setNewMessage('')
+    clearSelectedFile()
+  }
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (file.size > MAX_FILE_SIZE) {
+      Swal.fire('Archivo grande', 'El límite es 10MB.', 'warning')
+      clearSelectedFile()
+      return
+    }
+
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      Swal.fire(
+        'Formato no permitido',
+        'Solo se permiten imágenes JPG, PNG, GIF y archivos PDF.',
+        'warning',
+      )
+      clearSelectedFile()
+      return
+    }
+
+    setSelectedFile(file)
+  }
+
+  return (
+    <footer className="composer">
+      <div className="composer-inner">
+        {selectedFile && (
+          <div className="file-preview-strip">
+            <FontAwesomeIcon icon={faPaperclip} />
+            <span className="min-w-0 flex-1 truncate">{selectedFile.name}</span>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors focus:outline-none"
-              title="Adjuntar archivo"
+              onClick={clearSelectedFile}
+              className="icon-button !h-8 !w-8 !rounded-full"
+              aria-label="Quitar archivo"
+              title="Quitar archivo"
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                />
-              </svg>
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
         )}
-        <div className="flex-1">
+
+        <form
+          onSubmit={handleSendMessage}
+          className={`composer-form ${allowFiles ? '' : 'composer-form--text-only'}`}
+        >
+          {allowFiles && (
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileChange}
+                accept={ALLOWED_FILE_TYPES.join(',')}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="icon-button"
+                aria-label="Adjuntar archivo"
+                title="Adjuntar archivo"
+              >
+                <FontAwesomeIcon icon={faPaperclip} />
+              </button>
+            </div>
+          )}
+
           <Input
             type="text"
             placeholder="Escribe un mensaje..."
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(event) => setNewMessage(event.target.value)}
+            aria-label="Mensaje"
           />
-        </div>
-        <div className="w-24 h-[42px]">
-          <Button type="submit" text="Enviar" customClass="h-full" />
-        </div>
-      </form>
+
+          <button
+            type="submit"
+            className="icon-button send-button"
+            aria-label="Enviar mensaje"
+            title="Enviar mensaje"
+          >
+            <FontAwesomeIcon icon={faPaperPlane} />
+          </button>
+        </form>
+      </div>
     </footer>
   )
 }

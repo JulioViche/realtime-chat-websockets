@@ -11,7 +11,7 @@ const roomPool = new Piscina({
 
 exports.createRoom = async (req, res) => {
   try {
-    const { name, type } = req.body
+    const { name, type, pin } = req.body
 
     if (!name) {
       return res
@@ -19,29 +19,41 @@ exports.createRoom = async (req, res) => {
         .json({ error: 'El nombre de la sala es obligatorio' })
     }
 
-    // Delegar generación de PIN al worker
-    const pin = await roomPool.run({ action: 'generatePin' })
-    
+    if (!pin || !/^\d{4,}$/.test(pin)) {
+      return res
+        .status(400)
+        .json({ error: 'El PIN es obligatorio y debe tener al menos 4 dígitos numéricos' })
+    }
+
+    const pinFingerprint = Room.generatePinFingerprint(pin)
+    const existingRoom = await Room.findOne({ pinFingerprint })
+    if (existingRoom) {
+      return res.status(409).json({ error: 'Ya existe una sala con ese PIN. Usa uno diferente.' })
+    }
+
     const newRoom = new Room({
       name,
       pin,
-      type: type || 'TEXT', // Por defecto será TEXT si no envían nada
+      pinFingerprint,
+      type: type || 'TEXT',
     })
 
     const savedRoom = await newRoom.save()
 
-    // Devolvemos el PIN en plano solo al crearla para que el admin lo vea
     res.status(201).json({
       message: 'Sala creada exitosamente',
       room: {
         _id: savedRoom._id,
         name: savedRoom.name,
-        pin: pin, // PIN en texto plano para el admin
         type: savedRoom.type,
         isActive: savedRoom.isActive
       },
     })
   } catch (error) {
+    console.error('ERROR AL CREAR SALA:', error)
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Ya existe una sala con ese PIN. Usa uno diferente.' })
+    }
     res
       .status(500)
       .json({ error: 'Error al crear la sala', details: error.message })
@@ -50,7 +62,7 @@ exports.createRoom = async (req, res) => {
 
 exports.getAllRooms = async (req, res) => {
   try {
-    const rooms = await Room.find().sort({ createdAt: -1 })
+    const rooms = await Room.find().select('-pin').sort({ createdAt: -1 })
     res.status(200).json(rooms)
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener las salas', details: error.message })
