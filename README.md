@@ -1,146 +1,217 @@
 # Realtime Chat WebSockets
 
-Chat en tiempo real con salas privadas por PIN, panel admin y soporte multimedia.
+![Node.js](https://img.shields.io/badge/Node.js-Backend-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![React](https://img.shields.io/badge/React-Frontend-61DAFB?style=for-the-badge&logo=react&logoColor=0f172a)
+![Socket.io](https://img.shields.io/badge/Socket.io-Realtime-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Database-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-UI-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 
-Sistema web de chat en tiempo real con salas seguras por PIN, panel de administracion, mensajes en vivo por WebSockets, soporte para archivos en salas multimedia y procesamiento concurrente con Worker Threads.
+Sistema web de chat en tiempo real con salas privadas por PIN, panel de administracion, soporte multimedia y procesamiento concurrente con Worker Threads.
 
-El proyecto esta separado en backend y frontend. El backend expone una API REST, un servidor Socket.io y pools de workers para tareas pesadas. El frontend ofrece una experiencia responsive tipo landing/app, modo claro/oscuro persistente y vistas optimizadas para escritorio y movil.
+El proyecto une una API REST con un servidor WebSocket, persistencia en MongoDB, autenticacion JWT para administradores, salas `TEXT` y `MULTIMEDIA`, carga de archivos, modo oscuro, interfaz responsive y una experiencia cuidada para escritorio y movil.
+
+---
+
+## Vista Rapida
+
+| Modulo | Descripcion |
+|---|---|
+| Frontend | React 19, Vite 6, Tailwind CSS 4, React Router, Axios, Socket.io Client |
+| Backend | Node.js, Express 5, Socket.io 4, Mongoose 9, Multer |
+| Seguridad | JWT admin, bcrypt para PIN, HMAC con `PIN_PEPPER` |
+| Concurrencia | Piscina + Worker Threads |
+| Base de datos | MongoDB |
+| Pruebas | Jest, Supertest, socket.io-client |
+
+### Lo que hace
+
+- Crea salas privadas desde un panel administrador.
+- Permite entrar a salas por PIN y nickname.
+- Envia mensajes en tiempo real con Socket.io.
+- Guarda historial de mensajes en MongoDB.
+- Soporta salas solo texto y salas multimedia.
+- Permite imagenes y PDF de hasta 10 MB en salas `MULTIMEDIA`.
+- Muestra usuarios conectados en vivo.
+- Controla conflictos de sesion por IP/dispositivo.
+- Desconecta usuarios por inactividad despues de 30 minutos.
+- Usa workers para tareas costosas sin bloquear el hilo principal.
+- Incluye landing redisenada, modo claro/oscuro y experiencia movil.
+
+---
 
 ## Capturas
 
+### Landing e ingreso
+
 ![Vista de inicio](images/inicio.png)
+
+### Panel administrador
+
+![Panel de control admin](images/PanelDeControlAdmin.png)
+
+### Sala de chat
+
 ![Sala de chat](images/chat.png)
+
+---
 
 ## Tabla de Contenido
 
-- [Capturas](#capturas)
-- [Caracteristicas](#caracteristicas)
-- [Stack](#stack)
 - [Arquitectura](#arquitectura)
+- [Stack Tecnologico](#stack-tecnologico)
 - [Estructura del Proyecto](#estructura-del-proyecto)
-- [Requisitos Previos](#requisitos-previos)
-- [Instalacion Rapida](#instalacion-rapida)
+- [Instalacion](#instalacion)
 - [Variables de Entorno](#variables-de-entorno)
-- [Como Usar la App](#como-usar-la-app)
+- [Uso de la Aplicacion](#uso-de-la-aplicacion)
 - [API REST](#api-rest)
 - [Eventos WebSocket](#eventos-websocket)
-- [Salas TEXT vs MULTIMEDIA](#salas-text-vs-multimedia)
+- [Modelo de Datos](#modelo-de-datos)
+- [Seguridad](#seguridad)
+- [Workers y Concurrencia](#workers-y-concurrencia)
+- [Frontend y UX](#frontend-y-ux)
 - [Pruebas](#pruebas)
-- [Acceso desde Celular o Red Local](#acceso-desde-celular-o-red-local)
+- [Acceso desde Celular](#acceso-desde-celular)
 - [Troubleshooting](#troubleshooting)
 - [Documentacion Complementaria](#documentacion-complementaria)
 
-## Caracteristicas
-
-- Chat en tiempo real con Socket.io.
-- Creacion de salas privadas desde un panel administrador.
-- PIN de sala hasheado con bcrypt y huella HMAC para detectar duplicados sin guardar el PIN en plano.
-- Salas de tipo `TEXT` y `MULTIMEDIA`.
-- En salas `MULTIMEDIA`: subida de imagenes `jpeg`, `jpg`, `png`, `gif` y archivos `pdf` hasta 10 MB.
-- Historial de mensajes persistido en MongoDB.
-- Usuarios anonimos por nickname, sin registro previo.
-- Validacion de nickname unico dentro de cada sala.
-- Control de sesion unica por IP/dispositivo dentro de una sala.
-- Desconexion por inactividad despues de 30 minutos.
-- Procesamiento concurrente con Piscina y Worker Threads.
-- Frontend responsive con landing, panel admin, sala de chat, modo oscuro y modo claro.
-- Tema persistente en `localStorage` usando React Context, sin prop drilling.
-- Interfaz movil compacta: el composer cambia segun el tipo de sala.
-
-## Stack
-
-### Backend
-
-- Node.js
-- Express 5
-- Socket.io 4
-- MongoDB + Mongoose 9
-- bcrypt
-- jsonwebtoken
-- multer
-- Piscina
-- Worker Threads
-- Jest + Supertest
-
-### Frontend
-
-- React 19
-- Vite 6
-- Tailwind CSS 4
-- react-router-dom 7
-- axios
-- SweetAlert2
-- socket.io-client
-- Font Awesome
+---
 
 ## Arquitectura
 
 ```mermaid
 flowchart LR
-  U[Usuario / Navegador] --> F[Frontend React + Vite]
-  A[Administrador] --> F
+  User[Usuario] --> Frontend[React + Vite]
+  Admin[Administrador] --> Frontend
 
-  F -->|REST /api| B[Backend Express]
-  F <-->|Socket.io| S[Servidor WebSocket]
+  Frontend -->|REST /api| Express[Express API]
+  Frontend <-->|Socket.io| Socket[Servidor WebSocket]
 
-  B --> DB[(MongoDB)]
-  S --> DB
+  Express --> Mongo[(MongoDB)]
+  Socket --> Mongo
 
-  B --> AW[authWorker]
-  B --> FW[fileWorker]
-  B --> RP[Piscina roomWorker]
-  S --> SP[Piscina socketWorker]
+  Express --> AuthWorker[authWorker]
+  Express --> RoomWorker[roomWorker Piscina]
+  Express --> FileWorker[fileWorker]
+  Socket --> SocketWorker[socketWorker Piscina]
 
-  FW --> UP[uploads/]
+  FileWorker --> Uploads[backend/uploads]
 ```
 
-El backend mantiene las sesiones activas en memoria mediante un `Map`, no en base de datos. MongoDB almacena salas, mensajes y metadatos de archivos.
+### Flujo principal
+
+```mermaid
+sequenceDiagram
+  participant U as Usuario
+  participant F as Frontend
+  participant S as Socket.io
+  participant B as Express API
+  participant DB as MongoDB
+
+  U->>F: Ingresa nickname + PIN
+  F->>S: joinRoom { pin, user, force }
+  S->>DB: Busca sala activa y valida PIN
+  S-->>F: roomId + roomType
+  F->>B: GET /api/rooms/:pin/messages
+  B->>DB: Obtiene historial
+  B-->>F: messages + roomType
+  U->>F: Envia mensaje
+  F->>S: sendMessage { roomId, content, file }
+  S->>DB: Guarda Message / File
+  S-->>F: newMessage a toda la sala
+```
+
+El backend mantiene sesiones activas en memoria con `Map`, mientras MongoDB guarda datos persistentes: salas, mensajes y archivos.
+
+---
+
+## Stack Tecnologico
+
+### Backend
+
+| Tecnologia | Uso |
+|---|---|
+| Node.js | Runtime del servidor |
+| Express 5 | API REST |
+| Socket.io 4 | Comunicacion en tiempo real |
+| Mongoose 9 | Modelado de datos con MongoDB |
+| bcrypt | Hash seguro de PIN |
+| jsonwebtoken | Autenticacion de administrador |
+| multer | Subida de archivos |
+| Piscina | Pool de Worker Threads |
+| Jest + Supertest | Pruebas automatizadas |
+
+### Frontend
+
+| Tecnologia | Uso |
+|---|---|
+| React 19 | UI y componentes |
+| Vite 6 | Dev server y build |
+| Tailwind CSS 4 | Estilos |
+| React Router 7 | Rutas de la app |
+| Axios | Peticiones HTTP |
+| Socket.io Client | Conexion WebSocket |
+| SweetAlert2 | Alertas y confirmaciones |
+| Font Awesome | Iconografia |
+
+---
 
 ## Estructura del Proyecto
 
 ```text
 realtime-chat-websockets/
 ├── backend/
-│   ├── main.js
-│   ├── seed.js
+│   ├── main.js                  # Express + Socket.io + Piscina
+│   ├── seed.js                  # Datos de ejemplo
 │   ├── controllers/
+│   │   ├── authController.js
+│   │   └── roomController.js
 │   ├── middlewares/
+│   │   └── authMiddleware.js
 │   ├── models/
+│   │   ├── Room.js
+│   │   ├── Message.js
+│   │   └── File.js
 │   ├── routes/
+│   │   ├── authRoutes.js
+│   │   ├── roomRoutes.js
+│   │   └── uploadRoutes.js
 │   ├── tests/
 │   ├── uploads/
 │   └── workers/
+│       ├── authWorker.js
+│       ├── fileWorker.js
+│       ├── roomWorker.js
+│       └── socketWorker.js
 ├── frontend/
-│   ├── index.html
 │   ├── vite.config.js
 │   └── src/
 │       ├── App.jsx
-│       ├── assets/
 │       ├── context/
+│       ├── assets/
 │       └── components/
 │           ├── atoms/
 │           ├── molecules/
 │           ├── organisms/
 │           └── templates/
-└── docs/
-    ├── containers.md
-    ├── requisitos.md
-    └── datamodel/
+├── docs/
+├── images/
+└── README.md
 ```
 
-## Requisitos Previos
+---
+
+## Instalacion
+
+### Requisitos
 
 - Node.js 18 o superior.
 - npm.
-- MongoDB local o en Docker.
-- Git, si vas a clonar el repositorio.
+- MongoDB local o Docker.
+- Git.
 
-## Instalacion Rapida
-
-### 1. Clonar e instalar dependencias
+### 1. Instalar dependencias
 
 ```bash
-git clone <url-del-repositorio>
 cd realtime-chat-websockets
 
 cd backend
@@ -152,34 +223,36 @@ npm install
 
 ### 2. Levantar MongoDB
 
-Con MongoDB instalado localmente, verifica que este corriendo en `localhost:27017`.
-
-Tambien puedes usar Docker:
+Con MongoDB local:
 
 ```bash
-docker run --name mongodb -d -p 27017:27017 mongo:latest
+mongod
 ```
 
-Si usas MongoDB con usuario y clave, revisa [docs/containers.md](./docs/containers.md).
+Con Docker:
 
-### 3. Configurar variables de entorno
+```bash
+docker run --name realtime-chat-mongo -d -p 27017:27017 mongo:latest
+```
 
-Crea `backend/.env` y `frontend/.env` siguiendo los ejemplos de la siguiente seccion.
+### 3. Crear variables de entorno
 
-### 4. Iniciar backend
+Crea `backend/.env` y `frontend/.env` con los ejemplos de la siguiente seccion.
+
+### 4. Ejecutar backend
 
 ```bash
 cd backend
 node main.js
 ```
 
-El backend queda disponible en:
+Servidor:
 
 ```text
 http://localhost:3000
 ```
 
-### 5. Iniciar frontend
+### 5. Ejecutar frontend
 
 En otra terminal:
 
@@ -188,11 +261,13 @@ cd frontend
 npm run dev
 ```
 
-El frontend queda disponible normalmente en:
+Aplicacion:
 
 ```text
 http://localhost:5173
 ```
+
+---
 
 ## Variables de Entorno
 
@@ -207,11 +282,16 @@ ADMIN_PASS=admin123
 PIN_PEPPER=otra_clave_larga_para_huella_de_pins
 ```
 
-Notas importantes:
+| Variable | Obligatoria | Descripcion |
+|---|---:|---|
+| `PORT` | No | Puerto del backend. Por defecto `3000`. |
+| `MONGO_URI` | Si | Conexion a MongoDB. |
+| `JWT_SECRET` | Si | Firma y verificacion del token admin. |
+| `ADMIN_USER` | Si | Usuario del panel administrador. |
+| `ADMIN_PASS` | Si | Password del panel administrador. |
+| `PIN_PEPPER` | Si | Clave privada para crear huellas HMAC de PIN. |
 
-- `PIN_PEPPER` es obligatorio. Si no existe, el backend se detiene para evitar guardar PINs sin huella segura.
-- `JWT_SECRET` se usa para firmar/verificar el token del administrador.
-- `ADMIN_USER` y `ADMIN_PASS` definen las credenciales del panel admin.
+> `PIN_PEPPER` es obligatorio. Si no existe, el modelo `Room` detiene el backend para evitar guardar PINs sin huella segura.
 
 ### `frontend/.env`
 
@@ -219,64 +299,66 @@ Notas importantes:
 VITE_SOCKET_URL=http://localhost:3000
 ```
 
-Notas importantes:
+| Variable | Descripcion |
+|---|---|
+| `VITE_SOCKET_URL` | URL del servidor Socket.io y base para archivos subidos. |
 
-- La API REST usa rutas relativas `/api` y Vite las redirige al backend con el proxy configurado.
-- `VITE_SOCKET_URL` se usa para la conexion Socket.io y para construir URLs de archivos subidos.
+La API REST usa rutas relativas `/api` y Vite las redirige al backend mediante el proxy configurado.
 
-## Como Usar la App
+---
 
-### Flujo del administrador
+## Uso de la Aplicacion
 
-1. Abre el frontend.
+### Administrador
+
+1. Abre la app en el navegador.
 2. Entra a `/admin`.
-3. Inicia sesion con las credenciales de `backend/.env`.
-4. Entra al dashboard.
-5. Crea una sala con:
+3. Inicia sesion con `ADMIN_USER` y `ADMIN_PASS`.
+4. Crea una sala con:
    - Nombre.
    - PIN numerico de minimo 4 digitos.
-   - Tipo: `TEXT` o `MULTIMEDIA`.
-6. Comparte el PIN con los usuarios.
+   - Tipo `TEXT` o `MULTIMEDIA`.
+5. Comparte el PIN con los usuarios.
 
-Por seguridad, el panel no lista el PIN en texto plano despues de crear la sala. El PIN se guarda hasheado en MongoDB.
+Por seguridad, el panel no vuelve a mostrar el PIN en texto plano despues de crear la sala.
 
-### Flujo del usuario
+### Usuario
 
 1. Abre `/`.
-2. Ingresa un nickname.
-3. Ingresa el PIN de la sala.
-4. Entra a `/room/:pin`.
+2. Ingresa nickname.
+3. Ingresa PIN de sala.
+4. Entra al chat.
 5. Chatea en tiempo real.
-6. Si la sala es `MULTIMEDIA`, tambien podra adjuntar imagenes o PDF.
+6. Si la sala es `MULTIMEDIA`, adjunta imagenes o PDF.
 
-### Datos de prueba
-
-Puedes cargar datos iniciales:
+### Seed de datos
 
 ```bash
 cd backend
 node seed.js
 ```
 
-El seed limpia las colecciones y crea salas/mensajes de ejemplo. Requiere que `backend/.env` este configurado, incluyendo `PIN_PEPPER`.
+El seed limpia datos anteriores y crea salas/mensajes de ejemplo. Requiere `backend/.env` configurado.
+
+---
 
 ## API REST
 
-Base URL local:
+Base local:
 
 ```text
 http://localhost:3000
 ```
 
-| Metodo | Ruta | Auth | Descripcion |
+| Metodo | Ruta | Auth | Proposito |
 |---|---|---|---|
-| `GET` | `/` | No | Health check basico de la API. |
-| `POST` | `/api/auth/login` | No | Login del administrador. |
-| `POST` | `/api/rooms` | JWT | Crea una sala. |
-| `GET` | `/api/rooms` | JWT | Lista salas. No expone el PIN hasheado. |
+| `GET` | `/` | No | Health check de la API. |
+| `POST` | `/api/auth/login` | No | Login admin y emision de JWT. |
+| `POST` | `/api/rooms` | JWT | Crea sala. |
+| `GET` | `/api/rooms` | JWT | Lista salas sin exponer PIN. |
 | `DELETE` | `/api/rooms/:id` | JWT | Elimina sala y mensajes asociados. |
-| `GET` | `/api/rooms/:pin/messages` | No | Obtiene historial de una sala por PIN. |
-| `POST` | `/api/upload` | No | Sube un archivo permitido. |
+| `GET` | `/api/rooms/:pin/messages` | No | Obtiene historial y tipo de sala. |
+| `POST` | `/api/upload` | No | Sube archivo permitido. |
 
 ### Login admin
 
@@ -313,24 +395,56 @@ Content-Type: application/json
 {
   "name": "Sala de soporte",
   "pin": "1234",
-  "type": "TEXT"
+  "type": "MULTIMEDIA"
 }
 ```
 
-Tipos permitidos:
+Respuesta:
 
-- `TEXT`
-- `MULTIMEDIA`
+```json
+{
+  "message": "Sala creada exitosamente",
+  "room": {
+    "_id": "...",
+    "name": "Sala de soporte",
+    "type": "MULTIMEDIA",
+    "isActive": true
+  }
+}
+```
+
+### Subir archivo
+
+```http
+POST /api/upload
+Content-Type: multipart/form-data
+```
+
+Campo:
+
+```text
+file
+```
+
+Formatos permitidos:
+
+- `image/jpeg`
+- `image/jpg`
+- `image/png`
+- `image/gif`
+- `application/pdf`
+
+Limite:
+
+```text
+10 MB
+```
+
+---
 
 ## Eventos WebSocket
 
-La conexion se realiza contra:
-
-```text
-VITE_SOCKET_URL
-```
-
-Por defecto:
+Conexion por defecto:
 
 ```text
 http://localhost:3000
@@ -340,55 +454,152 @@ http://localhost:3000
 
 | Evento | Payload | Descripcion |
 |---|---|---|
-| `joinRoom` | `{ pin, user, force }` | Une al usuario a una sala si el PIN es valido. |
-| `sendMessage` | `{ roomId, content, file }` | Envia mensaje de texto o mensaje con archivo. |
-| `disconnect` | Automatico | Limpia la sesion en memoria. |
+| `joinRoom` | `{ pin, user, force }` | Une al usuario a una sala validando PIN, nickname y sesion. |
+| `sendMessage` | `{ roomId, content, file }` | Envia texto o archivo a la sala. |
+| `disconnect` | Automatico | Limpia la sesion activa en memoria. |
 
 ### Servidor a cliente
 
 | Evento | Payload | Descripcion |
 |---|---|---|
-| `newMessage` | Mensaje | Broadcast del mensaje nuevo a la sala. |
-| `userListUpdate` | `string[]` | Lista actualizada de usuarios conectados. |
-| `force_disconnect` | Mensaje | Cierra una sesion anterior cuando se fuerza la entrada. |
-| `inactivity_timeout` | Mensaje | Desconecta al usuario por inactividad. |
+| `newMessage` | Mensaje | Mensaje nuevo enviado a todos los usuarios de la sala. |
+| `userListUpdate` | `string[]` | Lista de usuarios conectados. |
+| `force_disconnect` | Mensaje | Desconecta una sesion anterior al forzar entrada. |
+| `inactivity_timeout` | Mensaje | Desconecta por inactividad. |
 
-## Salas TEXT vs MULTIMEDIA
+---
 
-### Sala `TEXT`
+## Modelo de Datos
 
-- Solo muestra input de texto y boton de envio.
-- No muestra boton de adjuntar archivo.
-- Pensada para conversaciones simples y rapidas.
+```mermaid
+erDiagram
+  ROOM ||--o{ MESSAGE : contains
+  MESSAGE ||--o| FILE : may_have
 
-### Sala `MULTIMEDIA`
+  ROOM {
+    ObjectId _id
+    string name
+    string pin
+    string pinFingerprint
+    string type
+    boolean isActive
+    date createdAt
+  }
 
-- Muestra boton de adjuntar archivo.
-- Permite:
-  - `image/jpeg`
-  - `image/jpg`
-  - `image/png`
-  - `image/gif`
-  - `application/pdf`
-- Limite maximo: 10 MB.
-- Muestra progreso de subida.
-- Guarda metadatos del archivo en MongoDB.
+  MESSAGE {
+    ObjectId _id
+    ObjectId roomId
+    string user
+    string content
+    string type
+    date createdAt
+  }
 
-## Seguridad y Concurrencia
+  FILE {
+    ObjectId _id
+    ObjectId messageId
+    string name
+    string url
+    string type
+    number size
+  }
+```
 
-- El admin usa JWT.
-- La firma del JWT se ejecuta en `authWorker.js`.
-- Los PINs se almacenan con bcrypt.
-- Se usa `PIN_PEPPER` para crear `pinFingerprint` con HMAC SHA-256 y detectar PINs duplicados.
-- La validacion de ingreso, filtrado de usuarios y procesamiento bajo carga se apoya en `socketWorker.js` mediante Piscina.
-- La validacion masiva de PIN para historial usa `roomWorker.js`.
-- La subida de archivos usa `fileWorker.js` como worker independiente.
-- El servidor aplica timeout de inactividad de 30 minutos.
-- El umbral de alta carga para procesamiento de mensajes en worker es mayor a 5 usuarios conectados.
+### Salas `TEXT`
+
+- Solo texto.
+- No muestran boton de adjuntar archivo.
+- Ideales para conversaciones rapidas y controladas.
+
+### Salas `MULTIMEDIA`
+
+- Texto y archivos.
+- Muestran boton de adjuntar.
+- Permiten imagenes y PDF.
+- Guardan metadatos del archivo en MongoDB.
+
+---
+
+## Seguridad
+
+| Capa | Implementacion |
+|---|---|
+| Admin | JWT firmado con `JWT_SECRET`. |
+| PIN | bcrypt para almacenar hash seguro. |
+| Duplicados | HMAC SHA-256 con `PIN_PEPPER` mediante `pinFingerprint`. |
+| Middleware | `authMiddleware.js` valida rutas admin. |
+| Sesiones | `usuariosConectados` controla socket, usuario, sala e IP. |
+| Inactividad | Timeout de 30 minutos por socket. |
+| Archivos | Filtro MIME y limite de 10 MB. |
+
+El PIN no se desencripta. Se compara el PIN ingresado contra el hash guardado usando bcrypt.
+
+---
+
+## Workers y Concurrencia
+
+El proyecto usa dos enfoques:
+
+### Piscina
+
+Para operaciones frecuentes:
+
+- `socketWorker.js`
+  - `validateJoin`
+  - `filterUsers`
+  - `processMessage`
+- `roomWorker.js`
+  - `verifyRoomPin`
+
+### Worker Thread directo
+
+Para operaciones puntuales:
+
+- `authWorker.js`
+  - Firma/verificacion de JWT.
+- `fileWorker.js`
+  - Procesamiento simulado de archivos.
+
+### Umbral de carga
+
+```js
+const HIGH_LOAD_THRESHOLD = 5
+```
+
+Si hay mas de 5 usuarios conectados, el procesamiento de mensajes se delega al worker.
+
+---
+
+## Frontend y UX
+
+El frontend esta organizado con Atomic Design:
+
+```text
+components/
+├── atoms/
+├── molecules/
+├── organisms/
+└── templates/
+```
+
+Mejoras incluidas:
+
+- Landing visual con enfoque de producto.
+- Panel administrador con metricas y lista de salas.
+- Chat full-screen en escritorio.
+- Composer optimizado para movil.
+- Modo claro/oscuro persistente.
+- Context API para tema sin prop drilling.
+- Distincion de sala `TEXT` vs `MULTIMEDIA`.
+- Previsualizacion de imagenes y enlaces a PDF.
+- Progreso de subida.
+- Alertas de sesion, errores y confirmaciones con SweetAlert2.
+
+---
 
 ## Pruebas
 
-Ejecutar pruebas del backend:
+### Backend
 
 ```bash
 cd backend
@@ -402,7 +613,16 @@ cd backend
 npm run test:watch
 ```
 
-Validar frontend:
+Suites incluidas:
+
+- Autenticacion.
+- Middleware JWT.
+- CRUD de salas.
+- WebSockets.
+- Upload de archivos.
+- Workers.
+
+### Frontend
 
 ```bash
 cd frontend
@@ -410,97 +630,133 @@ npm run lint
 npm run build
 ```
 
-## Acceso desde Celular o Red Local
+---
 
-1. Averigua la IP de tu equipo en la red. Ejemplo:
+## Acceso desde Celular
+
+1. Obtén la IP de tu equipo en la red local. Ejemplo:
 
 ```text
 192.168.1.20
 ```
 
-2. En `frontend/.env`, usa esa IP para Socket.io:
+2. Configura `frontend/.env`:
 
 ```env
 VITE_SOCKET_URL=http://192.168.1.20:3000
 ```
 
-3. Levanta el backend normalmente:
+3. Levanta backend:
 
 ```bash
 cd backend
 node main.js
 ```
 
-El backend escucha en `0.0.0.0`, por lo que queda visible en la red si el firewall lo permite.
-
-4. Levanta Vite exponiendolo en la red:
+4. Levanta frontend en red:
 
 ```bash
 cd frontend
 npm run dev -- --host 0.0.0.0
 ```
 
-5. En el celular abre:
+5. Abre desde el celular:
 
 ```text
 http://192.168.1.20:5173
 ```
 
-Si no carga, revisa firewall, red WiFi y que ambos dispositivos esten en la misma red.
+Si no carga, revisa firewall, red WiFi y que ambos dispositivos esten conectados a la misma red.
+
+---
 
 ## Troubleshooting
 
 ### El backend se cierra al iniciar
 
-Verifica que `PIN_PEPPER` exista en `backend/.env`.
+Revisa que exista `PIN_PEPPER` en `backend/.env`.
 
 ### No conecta a MongoDB
 
-Verifica `MONGO_URI` y que MongoDB este corriendo:
+Verifica `MONGO_URI` y que MongoDB este activo:
 
 ```bash
 mongosh
 ```
 
-O revisa el contenedor:
+Con Docker:
 
 ```bash
 docker ps
 ```
 
-### El frontend carga pero el chat no conecta
+### El frontend abre pero el chat no conecta
 
-Verifica `frontend/.env`:
+Revisa `frontend/.env`:
 
 ```env
 VITE_SOCKET_URL=http://localhost:3000
 ```
 
-Si estas en celular o red local, cambia `localhost` por la IP de tu equipo.
+Si estas usando un celular, cambia `localhost` por la IP del equipo.
 
-### No se suben archivos
+### No aparece el clip de adjuntar
+
+La sala probablemente es `TEXT`. Solo las salas `MULTIMEDIA` muestran adjuntos.
+
+### No sube archivos
 
 Verifica:
 
 - Que la sala sea `MULTIMEDIA`.
 - Que el archivo pese maximo 10 MB.
-- Que el tipo sea imagen o PDF.
-- Que exista la carpeta `backend/uploads/`.
+- Que el formato sea imagen o PDF.
+- Que exista `backend/uploads/`.
 
-### No puedo entrar porque hay una sesion activa
+### Hay conflicto de sesion
 
-El sistema detecta sesiones previas por IP/dispositivo. Puedes:
+El sistema detecta una sesion activa desde la misma IP/dispositivo. Puedes:
 
-- Continuar como el usuario ya conectado.
-- Forzar entrada con el nuevo nickname.
+- Continuar como el usuario existente.
+- Forzar entrada.
 - Volver al inicio.
+
+---
+
+## Comandos Utiles
+
+```bash
+# Backend
+cd backend
+npm install
+node main.js
+npm test
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+npm run build
+npm run lint
+
+# Seed
+cd backend
+node seed.js
+```
+
+---
 
 ## Documentacion Complementaria
 
 - [Requisitos del proyecto](./docs/requisitos.md)
 - [Modelo de datos](./docs/datamodel/datamodel.md)
 - [Contenedores Docker](./docs/containers.md)
+- [Presentacion del enunciado](./docs/proyecto_p1.pdf)
 
-## Estado
+---
 
-Proyecto desarrollado para Aplicaciones Distribuidas. Incluye backend, frontend, documentacion, workers, pruebas del backend y flujo completo de salas en tiempo real.
+## Estado del Proyecto
+
+Proyecto desarrollado para la asignatura de Aplicaciones Distribuidas.
+
+Incluye backend, frontend, WebSockets, workers, persistencia, autenticacion, subida de archivos, pruebas, documentacion y una interfaz responsive lista para demostracion.
