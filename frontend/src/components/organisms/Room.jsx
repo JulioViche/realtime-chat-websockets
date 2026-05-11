@@ -10,7 +10,16 @@ import MessageForm from '../molecules/MessageForm'
 import MessageBubble from '../molecules/MessageBubble'
 import RoomHeader from '../molecules/RoomHeader'
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
+const getSocketUrl = () => {
+  const envSocketUrl = import.meta.env.VITE_SOCKET_URL
+  if (envSocketUrl && envSocketUrl !== 'auto') return envSocketUrl
+
+  if (typeof window === 'undefined') return 'http://localhost:3000'
+
+  return `${window.location.protocol}//${window.location.hostname}:3000`
+}
+
+const SOCKET_URL = getSocketUrl()
 
 const Room = () => {
   const { pin } = useParams()
