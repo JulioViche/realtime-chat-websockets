@@ -1,5 +1,7 @@
 # Realtime Chat WebSockets
 
+Chat en tiempo real con salas privadas por PIN, panel admin y soporte multimedia.
+
 Sistema web de chat en tiempo real con salas seguras por PIN, panel de administracion, mensajes en vivo por WebSockets, soporte para archivos en salas multimedia y procesamiento concurrente con Worker Threads.
 
 El proyecto esta separado en backend y frontend. El backend expone una API REST, un servidor Socket.io y pools de workers para tareas pesadas. El frontend ofrece una experiencia responsive tipo landing/app, modo claro/oscuro persistente y vistas optimizadas para escritorio y movil.
@@ -11,8 +13,8 @@ El proyecto esta separado en backend y frontend. El backend expone una API REST,
 
 ## Tabla de Contenido
 
-- [Caracteristicas](#caracteristicas)
 - [Capturas](#capturas)
+- [Caracteristicas](#caracteristicas)
 - [Stack](#stack)
 - [Arquitectura](#arquitectura)
 - [Estructura del Proyecto](#estructura-del-proyecto)
